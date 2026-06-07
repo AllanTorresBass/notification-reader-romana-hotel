@@ -82,13 +82,15 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
   async upsert(
     input: Omit<
       PaymentRegisterCacheEntry,
-      'localId' | 'remoteRegisterId' | 'remoteInvoiceId' | 'invoiceStatus' | 'syncStatus' | 'lastSyncError' | 'createdAt' | 'updatedAt'
+      'localId' | 'remoteRegisterId' | 'remoteInvoiceId' | 'invoiceStatus' | 'syncStatus' | 'assignedClientId' | 'assignedClientName' | 'lastSyncError' | 'createdAt' | 'updatedAt'
     > & {
       localId?: string;
       remoteRegisterId?: string | null;
       remoteInvoiceId?: string | null;
       invoiceStatus?: PaymentRegisterCacheEntry['invoiceStatus'];
       syncStatus?: SyncStatus;
+      assignedClientId?: string | null;
+      assignedClientName?: string | null;
       lastSyncError?: string | null;
     }
   ): Promise<PaymentRegisterCacheEntry> {
@@ -110,6 +112,8 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
       notificationId: input.notificationId,
       invoiceStatus: input.invoiceStatus ?? existing?.invoiceStatus ?? null,
       syncStatus: input.syncStatus ?? existing?.syncStatus ?? 'pending_sync',
+      assignedClientId: input.assignedClientId ?? existing?.assignedClientId ?? null,
+      assignedClientName: input.assignedClientName ?? existing?.assignedClientName ?? null,
       lastSyncError: input.lastSyncError ?? existing?.lastSyncError ?? null,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
@@ -141,6 +145,8 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
         | 'name'
         | 'pago'
         | 'mobile'
+        | 'assignedClientId'
+        | 'assignedClientName'
       >
     >
   ): Promise<PaymentRegisterCacheEntry | null> {

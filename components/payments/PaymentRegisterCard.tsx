@@ -50,6 +50,10 @@ export function PaymentRegisterCard({ entry, onPress }: PaymentRegisterCardProps
 
         <Badge label={entry.name ?? 'Sin nombre'} variant="secondary" />
 
+        {entry.assignedClientName ? (
+          <Badge label={entry.assignedClientName} variant="success" />
+        ) : null}
+
         <Badge
           label={formatSyncStatusLabel(entry.syncStatus, entry.invoiceStatus)}
           variant={getBadgeVariant(entry.syncStatus)}

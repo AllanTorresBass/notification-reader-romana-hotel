@@ -1,5 +1,7 @@
+import { copy } from '@/constants/copy';
 import {
   formatAssignClientOutcome,
+  formatCaptureBatchOutcome,
   formatConfirmPaymentOutcome,
   formatCaptureNotificationOutcome,
   formatManualRegisterOutcome,
@@ -32,7 +34,7 @@ describe('formatConfirmPaymentOutcome', () => {
   it('returns queued message when offline', () => {
     const outcome = formatConfirmPaymentOutcome({ entry: baseEntry, status: 'queued' });
     expect(outcome.status).toBe('queued');
-    expect(outcome.title).toBe('Confirmación guardada');
+    expect(outcome.title).toBe(copy.pagos.actions.confirm.queuedTitle);
     expect(outcome.message).toContain('Bs.');
   });
 
@@ -40,13 +42,13 @@ describe('formatConfirmPaymentOutcome', () => {
     const outcome = formatConfirmPaymentOutcome({ entry: baseEntry, status: 'completed' });
     expect(outcome.status).toBe('completed');
     expect(outcome.title).toBe('Pago confirmado');
-    expect(outcome.message).toContain('factura marcada como pagada');
+    expect(outcome.message).toContain('factura quedó marcada como pagada');
   });
 
   it('returns skipped when already done', () => {
     const outcome = formatConfirmPaymentOutcome({ entry: baseEntry, status: 'already_done' });
     expect(outcome.status).toBe('skipped');
-    expect(outcome.title).toBe('Ya estaba confirmado');
+    expect(outcome.title).toBe(copy.pagos.actions.confirm.alreadyTitle);
   });
 });
 
@@ -54,7 +56,7 @@ describe('formatAssignClientOutcome', () => {
   it('returns queued message when offline', () => {
     const outcome = formatAssignClientOutcome({ entry: baseEntry, status: 'queued' }, 'Ana López');
     expect(outcome.status).toBe('queued');
-    expect(outcome.title).toBe('Asociación guardada');
+    expect(outcome.title).toBe(copy.pagos.actions.assign.queuedTitle);
     expect(outcome.message).toContain('Ana López');
   });
 
@@ -71,8 +73,12 @@ describe('formatAssignClientOutcome', () => {
 
 describe('formatManualRegisterOutcome', () => {
   it('distinguishes queued vs completed', () => {
-    expect(formatManualRegisterOutcome('queued').status).toBe('queued');
-    expect(formatManualRegisterOutcome('completed').status).toBe('completed');
+    expect(formatManualRegisterOutcome('queued').title).toBe(
+      copy.feedback.payment.manualQueuedTitle
+    );
+    expect(formatManualRegisterOutcome('completed').title).toBe(
+      copy.feedback.payment.manualCompletedTitle
+    );
   });
 });
 
@@ -98,7 +104,7 @@ describe('formatCaptureNotificationOutcome', () => {
       partialParse: false,
     });
     expect(outcome?.status).toBe('skipped');
-    expect(outcome?.title).toBe('Pago ya registrado');
+    expect(outcome?.title).toBe(copy.feedback.capture.duplicateTitle);
   });
 
   it('returns partial for parse failure', () => {
@@ -110,6 +116,7 @@ describe('formatCaptureNotificationOutcome', () => {
       partialParse: false,
     });
     expect(outcome?.status).toBe('partial');
+    expect(outcome?.title).toBe(copy.feedback.capture.parseFailedTitle);
   });
 
   it('returns completed for new capture', () => {
@@ -121,7 +128,16 @@ describe('formatCaptureNotificationOutcome', () => {
       partialParse: false,
     });
     expect(outcome?.status).toBe('completed');
-    expect(outcome?.title).toBe('Nuevo pago detectado');
+    expect(outcome?.title).toBe(copy.feedback.capture.completedTitle);
+    expect(outcome?.message).toContain('Bs.');
+  });
+});
+
+describe('formatCaptureBatchOutcome', () => {
+  it('uses batch copy for multiple captures', () => {
+    const outcome = formatCaptureBatchOutcome(3);
+    expect(outcome.title).toBe(copy.feedback.capture.batchTitle);
+    expect(outcome.message).toContain('3');
   });
 });
 
@@ -139,6 +155,7 @@ describe('formatPullSyncOutcome', () => {
       errorMessage: 'Sin conexión',
     });
     expect(outcome.status).toBe('failed');
+    expect(outcome.title).toBe(copy.feedback.sync.failedTitle);
   });
 
   it('returns skipped when sync in flight', () => {
@@ -154,7 +171,7 @@ describe('formatPullSyncOutcome', () => {
       errorMessage: null,
     });
     expect(outcome.status).toBe('skipped');
-    expect(outcome.title).toBe('Sincronización en curso');
+    expect(outcome.title).toBe(copy.feedback.sync.inFlightTitle);
   });
 
   it('returns completed with summary', () => {
@@ -170,7 +187,8 @@ describe('formatPullSyncOutcome', () => {
       errorMessage: null,
     });
     expect(outcome.status).toBe('completed');
-    expect(outcome.message).toContain('2 pago(s) nuevo(s)');
+    expect(outcome.message).toContain('2 pagos nuevos importados');
+    expect(outcome.message).toContain('Datos actualizados desde kd-gym.');
   });
 });
 
@@ -178,17 +196,21 @@ describe('formatShadeSyncOutcome', () => {
   it('returns failed when listener disconnected', () => {
     const outcome = formatShadeSyncOutcome({ scanned: 0, ingested: 0, listenerConnected: false });
     expect(outcome.status).toBe('failed');
+    expect(outcome.title).toBe(copy.feedback.notifications.serviceDownTitle);
   });
 
   it('returns skipped when no notifications', () => {
     const outcome = formatShadeSyncOutcome({ scanned: 0, ingested: 0, listenerConnected: true });
     expect(outcome.status).toBe('skipped');
+    expect(outcome.title).toBe(copy.feedback.notifications.emptyTitle);
   });
 
   it('returns completed when ingested', () => {
     const outcome = formatShadeSyncOutcome({ scanned: 3, ingested: 2, listenerConnected: true });
     expect(outcome.status).toBe('completed');
-    expect(outcome.message).toContain('3 escaneada(s)');
+    expect(outcome.title).toBe(copy.feedback.notifications.importedTitle);
+    expect(outcome.message).toContain('3 alertas BDV');
+    expect(outcome.message).toContain('2 notificaciones nuevas');
   });
 });
 
@@ -196,15 +218,18 @@ describe('formatQueueRetryOutcome', () => {
   it('returns partial when some failed', () => {
     const outcome = formatQueueRetryOutcome({ processed: 2, failed: 1, pendingJobs: 1 });
     expect(outcome.status).toBe('partial');
+    expect(outcome.title).toBe(copy.feedback.queue.partialTitle);
   });
 
   it('returns skipped when nothing to retry', () => {
     const outcome = formatQueueRetryOutcome({ processed: 0, failed: 0, pendingJobs: 0 });
     expect(outcome.status).toBe('skipped');
+    expect(outcome.title).toBe(copy.feedback.queue.emptyTitle);
   });
 
   it('returns completed on success', () => {
     const outcome = formatQueueRetryOutcome({ processed: 3, failed: 0, pendingJobs: 0 });
     expect(outcome.status).toBe('completed');
+    expect(outcome.title).toBe(copy.feedback.queue.completedTitle);
   });
 });

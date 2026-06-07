@@ -87,6 +87,9 @@ export const PaymentDetailSheet = forwardRef<BottomSheet, PaymentDetailSheetProp
                 <DetailRow label="Fecha" value={entry.paymentDate || '—'} />
                 <DetailRow label="Hora" value={entry.paymentTime || '—'} />
                 <DetailRow label="Nombre" value={entry.name ?? 'Sin nombre'} />
+                {entry.assignedClientName ? (
+                  <DetailRow label="Cliente kd-gym" value={entry.assignedClientName} />
+                ) : null}
               </View>
 
               <PaymentStatusStepper

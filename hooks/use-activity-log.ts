@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo } from 'react';
 
+import { copy } from '@/constants/copy';
 import { useIsApiAuthenticated } from '@/hooks/use-api-auth';
 import { queryKeys } from '@/lib/query-keys';
 import { activityLogSyncService } from '@/lib/services/feedback/ActivityLogSyncService';
@@ -46,11 +47,11 @@ export function useActivityLogPanel() {
   const pendingUploads = entries.filter((entry) => !entry.synced).length;
   const sourceLabel = isAuthenticated
     ? remoteQuery.data
-      ? 'Sincronizado con kd-gym'
+      ? copy.feedback.activity.sourceSynced
       : pendingUploads > 0
-        ? `${pendingUploads} pendiente(s) de subir`
-        : 'Local + kd-gym'
-    : `${entries.length} evento(s) en este dispositivo`;
+        ? copy.feedback.activity.sourcePending(pendingUploads)
+        : copy.feedback.activity.sourceHybrid
+    : copy.feedback.activity.sourceLocal(entries.length);
 
   const clearAll = useCallback(async () => {
     try {

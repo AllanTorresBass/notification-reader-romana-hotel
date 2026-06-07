@@ -54,9 +54,10 @@ export function useAssignClientMutation() {
 
   return useMutation({
     mutationFn: (input: { localId: string; clientId: string; clientName?: string }) =>
-      paymentRegisterService.assignClient(input.localId, input.clientId),
+      paymentRegisterService.assignClient(input.localId, input.clientId, input.clientName),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.lists() });
+      void queryClient.removeQueries({ queryKey: queryKeys.clients.all });
     },
     onError: (error) => reportError('assign_client', error, 'No se pudo asociar el cliente.'),
   });

@@ -1,3 +1,4 @@
+import { copy } from '@/constants/copy';
 import type { PaymentSyncResult } from '@/lib/services/payments/PaymentSyncOrchestrator';
 import type { NotificationShadeSyncResult } from '@/lib/services/native/notification-shade-sync';
 import {
@@ -14,6 +15,8 @@ import type {
 import type { OperationKind, OperationOutcome } from '@/types/feedback/operation-outcome.types';
 import type { PaymentRegisterCacheEntry } from '@/types/payment/payment-register-cache.types';
 
+const fb = copy.feedback;
+
 function outcome(
   kind: OperationKind,
   status: OperationOutcome['status'],
@@ -22,6 +25,23 @@ function outcome(
   extra?: Partial<OperationOutcome>
 ): OperationOutcome {
   return { kind, status, title, message, ...extra };
+}
+
+function buildSyncSummary(result: PaymentSyncResult): string {
+  const parts: string[] = [];
+  if (result.created > 0) {
+    parts.push(`${fb.sync.createdDetail(result.created)}.`);
+  }
+  if (result.enqueued > 0) {
+    parts.push(`${fb.sync.enqueuedDetail(result.enqueued)}.`);
+  }
+  if (result.pulled) {
+    parts.push(fb.sync.dataUpdated);
+  }
+  if (parts.length > 0) {
+    return parts.join(' ');
+  }
+  return fb.sync.upToDate(result.pendingJobs);
 }
 
 export function formatConfirmPaymentOutcome(result: {
@@ -61,42 +81,65 @@ export function formatManualRegisterOutcome(status: ActionDispatchStatus): Opera
     return outcome(
       'manual_register',
       'queued',
-      'Pago registrado',
-      'Guardado localmente. Se sincronizará con kd-gym en cuanto haya conexión.'
+      fb.payment.manualQueuedTitle,
+      fb.payment.manualQueuedMessage
     );
   }
-  return outcome('manual_register', 'completed', 'Pago registrado', 'Registro creado en kd-gym.');
+  return outcome(
+    'manual_register',
+    'completed',
+    fb.payment.manualCompletedTitle,
+    fb.payment.manualCompletedMessage
+  );
 }
 
-export function formatCaptureNotificationOutcome(result: IngestNotificationResult): OperationOutcome | null {
+export function formatCaptureBatchOutcome(count: number): OperationOutcome {
+  return outcome(
+    'capture_notification',
+    'completed',
+    fb.capture.batchTitle,
+    fb.capture.batchMessage(count),
+    { meta: { count } }
+  );
+}
+
+export function formatCaptureNotificationOutcome(
+  result: IngestNotificationResult
+): OperationOutcome | null {
   if (!result.entry) return null;
   if (result.duplicate) {
-    return outcome('capture_notification', 'skipped', 'Pago ya registrado', 'Esta notificación ya estaba en la lista.');
+    return outcome(
+      'capture_notification',
+      'skipped',
+      fb.capture.duplicateTitle,
+      fb.capture.duplicateMessage
+    );
   }
   if (result.parseFailed) {
     return outcome(
       'capture_notification',
       'partial',
-      'Pago detectado',
-      'No se pudo leer el texto completo. Complete el registro manualmente.',
-      { actionLabel: 'Registro manual', actionRoute: '/(tabs)/feed' }
+      fb.capture.parseFailedTitle,
+      fb.capture.parseFailedMessage,
+      { actionLabel: fb.capture.manualAction, actionRoute: '/(tabs)/feed' }
     );
   }
   if (result.partialParse) {
     return outcome(
       'capture_notification',
       'partial',
-      'Pago detectado',
-      'Datos parciales. Revise referencia y fecha antes de sincronizar.',
+      fb.capture.partialTitle,
+      fb.capture.partialMessage,
       { meta: { pago: result.entry.pago } }
     );
   }
   if (result.created) {
+    const amount = `Bs. ${formatPagoDisplay(result.entry.pago)}`;
     return outcome(
       'capture_notification',
       'completed',
-      'Nuevo pago detectado',
-      `Bs. ${formatPagoDisplay(result.entry.pago)} · pendiente de sync`,
+      fb.capture.completedTitle,
+      fb.capture.completedMessage(amount),
       { meta: { pago: result.entry.pago } }
     );
   }
@@ -108,7 +151,7 @@ export function formatPullSyncOutcome(result: PaymentSyncResult): OperationOutco
     return outcome(
       'pull_sync',
       'failed',
-      'No se pudo sincronizar',
+      fb.sync.failedTitle,
       result.errorMessage,
       { meta: { errorCode: result.errorCode ?? 'unknown', pendingJobs: result.pendingJobs } }
     );
@@ -117,16 +160,11 @@ export function formatPullSyncOutcome(result: PaymentSyncResult): OperationOutco
     return outcome(
       'background_sync',
       'skipped',
-      'Sincronización en curso',
-      'Ya hay una sincronización activa. Intenta de nuevo en un momento.'
+      fb.sync.inFlightTitle,
+      fb.sync.inFlightMessage
     );
   }
-  const parts: string[] = [];
-  if (result.created > 0) parts.push(`${result.created} pago(s) nuevo(s)`);
-  if (result.enqueued > 0) parts.push(`${result.enqueued} en cola`);
-  if (result.pulled) parts.push('datos actualizados');
-  const detail = parts.length > 0 ? parts.join(' · ') : `Cola: ${result.pendingJobs}`;
-  return outcome('pull_sync', 'completed', 'Sincronización completa', detail, {
+  return outcome('pull_sync', 'completed', fb.sync.completeTitle, buildSyncSummary(result), {
     meta: {
       created: result.created,
       enqueued: result.enqueued,
@@ -144,32 +182,34 @@ export function formatShadeSyncOutcome(
     return outcome(
       'shade_sync',
       'failed',
-      'Servicio no conectado',
-      'El lector de notificaciones no está activo. Reinicia la app o el teléfono.'
+      fb.notifications.serviceDownTitle,
+      fb.notifications.serviceDownMessage
     );
   }
   if (result.scanned === 0) {
     return outcome(
       'shade_sync',
       'skipped',
-      'Sin notificaciones BDV',
-      'No hay notificaciones de Banco de Venezuela visibles en la barra.'
+      fb.notifications.emptyTitle,
+      fb.notifications.emptyMessage
     );
   }
   if (result.ingested === 0) {
     return outcome(
       'shade_sync',
       'skipped',
-      'Sin cambios',
-      `${result.scanned} notificación(es) BDV revisada(s). Nada nuevo que importar.`
+      fb.notifications.noChangesTitle,
+      fb.notifications.noChangesMessage(result.scanned)
     );
   }
-  const title = options?.includeSync ? 'Escaneo y sync completados' : 'Notificaciones importadas';
+  const title = options?.includeSync
+    ? fb.notifications.importedWithSyncTitle
+    : fb.notifications.importedTitle;
   return outcome(
     'shade_sync',
     'completed',
     title,
-    `${result.scanned} escaneada(s) · ${result.ingested} guardada(s)`,
+    fb.notifications.importedMessage(result.scanned, result.ingested),
     { meta: { scanned: result.scanned, ingested: result.ingested } }
   );
 }
@@ -179,19 +219,19 @@ export function formatQueueRetryOutcome(result: QueueProcessResult): OperationOu
     return outcome(
       'queue_retry',
       'partial',
-      'Reintento completado',
-      `${result.processed} procesado(s) · ${result.failed} con error · cola: ${result.pendingJobs}`,
+      fb.queue.partialTitle,
+      fb.queue.partialMessage(result.processed, result.failed, result.pendingJobs),
       { meta: { ...result } }
     );
   }
   if (result.processed === 0 && result.pendingJobs === 0) {
-    return outcome('queue_retry', 'skipped', 'Nada que reintentar', 'No hay trabajos pendientes en la cola.');
+    return outcome('queue_retry', 'skipped', fb.queue.emptyTitle, fb.queue.emptyMessage);
   }
   return outcome(
     'queue_retry',
     'completed',
-    'Reintento completado',
-    `${result.processed} trabajo(s) procesado(s) · cola: ${result.pendingJobs}`,
+    fb.queue.completedTitle,
+    fb.queue.completedMessage(result.processed, result.pendingJobs),
     { meta: { ...result } }
   );
 }
@@ -204,28 +244,34 @@ export function formatRescanBdvOutcome(input: {
     return outcome(
       'rescan_bdv',
       'failed',
-      'Servicio no conectado',
-      'El lector de notificaciones no está activo.'
+      fb.notifications.serviceDownTitle,
+      fb.notifications.serviceDownShort
     );
   }
   if (input.shade.scanned === 0) {
     return outcome(
       'rescan_bdv',
       'skipped',
-      'Sin notificaciones BDV',
-      'No hay notificaciones BDV visibles en la barra.'
+      fb.notifications.emptyTitle,
+      fb.notifications.emptyMessage
     );
   }
-  const syncPart =
-    input.syncCreated > 0
-      ? `${input.syncCreated} pago(s) detectado(s).`
-      : 'No se detectaron pagos nuevos (puede que ya estén registrados).';
   return outcome(
     'rescan_bdv',
     'completed',
-    'Escaneo completo',
-    `${input.shade.scanned} notificación(es) · ${input.shade.ingested} guardada(s). ${syncPart}`,
-    { meta: { scanned: input.shade.scanned, ingested: input.shade.ingested, created: input.syncCreated } }
+    fb.notifications.rescanCompletedTitle,
+    fb.notifications.rescanCompletedMessage(
+      input.shade.scanned,
+      input.shade.ingested,
+      input.syncCreated
+    ),
+    {
+      meta: {
+        scanned: input.shade.scanned,
+        ingested: input.shade.ingested,
+        created: input.syncCreated,
+      },
+    }
   );
 }
 
@@ -241,29 +287,43 @@ export function formatErrorOutcome(
 
 export function formatLoginOutcome(success: boolean, error?: unknown): OperationOutcome {
   if (success) {
-    return outcome('login', 'completed', 'Conectado', 'Pagos sincronizando con kd-gym.');
+    return outcome('login', 'completed', fb.session.loginTitle, fb.session.loginMessage);
   }
-  return formatErrorOutcome('login', error ?? new Error('Login failed'), 'Verifica URL, email y contraseña.');
+  return formatErrorOutcome(
+    'login',
+    error ?? new Error('Login failed'),
+    fb.session.loginFallback
+  );
 }
 
 export function formatLogoutOutcome(): OperationOutcome {
-  return outcome('logout', 'completed', 'Sesión cerrada', 'Ya no se sincronizarán pagos con kd-gym.');
+  return outcome('logout', 'completed', fb.session.logoutTitle, fb.session.logoutMessage);
 }
 
 export function formatClearCacheOutcome(): OperationOutcome {
-  return outcome('clear_cache', 'completed', 'Caché limpiada', 'Los registros locales fueron eliminados.');
+  return outcome(
+    'clear_cache',
+    'completed',
+    fb.storage.cacheClearedTitle,
+    fb.storage.cacheClearedMessage
+  );
 }
 
 export function formatClearHistoryOutcome(): OperationOutcome {
-  return outcome('clear_history', 'completed', 'Historial borrado', 'Las notificaciones guardadas fueron eliminadas.');
+  return outcome(
+    'clear_history',
+    'completed',
+    fb.storage.historyClearedTitle,
+    fb.storage.historyClearedMessage
+  );
 }
 
 export function formatPurgeRetentionOutcome(removed: number): OperationOutcome {
   return outcome(
     'purge_retention',
     'completed',
-    'Retención aplicada',
-    removed > 0 ? `${removed} registro(s) antiguo(s) eliminado(s).` : 'No había registros fuera del período de retención.'
+    fb.storage.retentionAppliedTitle,
+    fb.storage.retentionAppliedMessage(removed)
   );
 }
 
@@ -271,8 +331,8 @@ export function formatCreateClientOutcome(clientName: string): OperationOutcome 
   return outcome(
     'create_client',
     'completed',
-    'Cliente creado',
-    `${clientName} fue creado y asociado al pago.`
+    fb.client.createdTitle,
+    fb.client.createdMessage(clientName)
   );
 }
 
@@ -281,7 +341,7 @@ export function formatTestConnectionOutcome(result: PaymentSyncResult): Operatio
     return formatErrorOutcome(
       'test_connection',
       new Error(result.errorMessage),
-      'No se pudo conectar con kd-gym.',
+      fb.connection.failedFallback,
       'fetch'
     );
   }
@@ -289,28 +349,33 @@ export function formatTestConnectionOutcome(result: PaymentSyncResult): Operatio
     return outcome(
       'test_connection',
       'partial',
-      'Conexión OK',
-      'Inicia sesión staff para sincronizar pagos.'
+      fb.connection.partialTitle,
+      fb.connection.partialMessage
     );
   }
   return outcome(
     'test_connection',
     'completed',
-    'Conexión OK',
-    `Sincronización completada. Cola: ${result.pendingJobs} · ${result.durationMs}ms`,
+    fb.connection.okTitle,
+    fb.connection.okMessage(result.pendingJobs, result.durationMs),
     { meta: { pendingJobs: result.pendingJobs, durationMs: result.durationMs } }
   );
 }
 
 export function formatAccessCheckOutcome(hasAccess: boolean): OperationOutcome {
   if (hasAccess) {
-    return outcome('access_check', 'completed', 'Acceso detectado', 'Puedes continuar con la configuración.');
+    return outcome(
+      'access_check',
+      'completed',
+      fb.onboarding.accessGrantedTitle,
+      fb.onboarding.accessGrantedMessage
+    );
   }
   return outcome(
     'access_check',
     'failed',
-    'Aún sin acceso',
-    'Activa el acceso a notificaciones en Ajustes de Android.'
+    fb.onboarding.accessDeniedTitle,
+    fb.onboarding.accessDeniedMessage
   );
 }
 
@@ -318,8 +383,8 @@ export function formatOnboardingSkipOutcome(): OperationOutcome {
   return outcome(
     'onboarding_skip',
     'partial',
-    'Conexión omitida',
-    'Podrás conectar kd-gym después en Ajustes.'
+    fb.onboarding.skipConnectTitle,
+    fb.onboarding.skipConnectMessage
   );
 }
 
@@ -331,10 +396,19 @@ export function formatBackgroundSyncOutcome(result: PaymentSyncResult): Operatio
     return outcome(
       'background_sync',
       'completed',
-      'Nuevos pagos detectados',
-      `${result.created} pago(s) importado(s) desde notificaciones guardadas.`,
+      fb.sync.backgroundTitle,
+      fb.sync.backgroundMessage(result.created),
       { meta: { created: result.created } }
     );
   }
   return null;
+}
+
+export function formatPackageHistoryRemovedOutcome(): OperationOutcome {
+  return outcome(
+    'clear_history',
+    'completed',
+    fb.notifications.packageHistoryRemovedTitle,
+    fb.notifications.packageHistoryRemovedMessage
+  );
 }

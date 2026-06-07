@@ -74,6 +74,7 @@ export default function PagosScreen() {
   const [actionBanner, setActionBanner] = useState<BannerItem | null>(null);
   const [detailFeedback, setDetailFeedback] = useState<OperationOutcome | null>(null);
   const [assigningClientId, setAssigningClientId] = useState<string | null>(null);
+  const [assignSheetResetToken, setAssignSheetResetToken] = useState(0);
 
   const detailRef = useRef<BottomSheet>(null);
   const assignRef = useRef<BottomSheet>(null);
@@ -177,9 +178,25 @@ export default function PagosScreen() {
 
   const openDetail = useCallback((entry: PaymentRegisterCacheEntry) => {
     setDetailFeedback(null);
+    setAssigningClientId(null);
     setSelected(entry);
     detailRef.current?.expand();
   }, []);
+
+  const resetAssignSheetDraft = useCallback(() => {
+    setAssignSheetResetToken((token) => token + 1);
+    setAssigningClientId(null);
+  }, []);
+
+  const resetPaymentWorkflow = useCallback(() => {
+    assignRef.current?.close();
+    detailRef.current?.close();
+    setSelected(null);
+    setDetailFeedback(null);
+    resetAssignSheetDraft();
+    void queryClient.invalidateQueries({ queryKey: queryKeys.clients.all });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.lists() });
+  }, [queryClient, resetAssignSheetDraft]);
 
   const refresh = useCallback(async () => {
     try {
@@ -249,18 +266,27 @@ export default function PagosScreen() {
             const outcome = formatAssignClientOutcome(result, clientName);
             reportOutcome(outcome, { toast: false, log: true });
             showActionBanner(outcome);
+            resetAssignSheetDraft();
+
+            if (result.status === 'completed' || result.status === 'already_done') {
+              if (result.status === 'completed') {
+                void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
+              resetPaymentWorkflow();
+              return;
+            }
+
             assignRef.current?.close();
-            setAssigningClientId(null);
-            if (result.entry) setSelected(result.entry);
-            if (result.status === 'completed') {
-              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            if (result.entry) {
+              setSelected(result.entry);
+              detailRef.current?.expand();
             }
           },
           onError: () => setAssigningClientId(null),
         }
       );
     },
-    [selected, assignClient, showActionBanner]
+    [selected, assignClient, showActionBanner, resetAssignSheetDraft, resetPaymentWorkflow]
   );
 
   const submitManual = useCallback(() => {
@@ -371,6 +397,7 @@ export default function PagosScreen() {
         onAssign={handleAssign}
         isAssigning={assignClient.isPending}
         assigningClientId={assigningClientId}
+        resetToken={assignSheetResetToken}
       />
     </AppScreen>
   );

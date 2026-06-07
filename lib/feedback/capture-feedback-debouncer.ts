@@ -1,4 +1,7 @@
-import { formatCaptureNotificationOutcome } from '@/lib/feedback/format-operation-outcome';
+import {
+  formatCaptureBatchOutcome,
+  formatCaptureNotificationOutcome,
+} from '@/lib/feedback/format-operation-outcome';
 import { reportOutcome } from '@/lib/feedback/report-feedback';
 import type { IngestNotificationResult } from '@/types/payment/payment-action-result.types';
 
@@ -23,16 +26,7 @@ export function reportCaptureNotificationDebounced(result: IngestNotificationRes
     debounceTimer = null;
 
     if (count > 1) {
-      reportOutcome(
-        {
-          kind: 'capture_notification',
-          status: 'completed',
-          title: 'Nuevos pagos detectados',
-          message: `${count} pagos importados desde notificaciones BDV.`,
-          meta: { count },
-        },
-        { toast: true, log: true }
-      );
+      reportOutcome(formatCaptureBatchOutcome(count), { toast: true, log: true });
       return;
     }
 

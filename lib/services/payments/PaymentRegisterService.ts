@@ -213,7 +213,11 @@ export class PaymentRegisterService {
     return { entry, status: 'queued' };
   }
 
-  async assignClient(localId: string, clientId: string): Promise<PaymentActionResult> {
+  async assignClient(
+    localId: string,
+    clientId: string,
+    clientName?: string | null
+  ): Promise<PaymentActionResult> {
     const entry = await paymentRegisterCacheRepository.getByLocalId(localId);
     if (!entry) return { entry: null, status: 'queued' };
 
@@ -221,8 +225,16 @@ export class PaymentRegisterService {
       return { entry, status: 'already_done' };
     }
 
+    const clientPatch = {
+      assignedClientId: clientId,
+      assignedClientName: clientName?.trim() || null,
+    };
+
     if (!entry.remoteRegisterId) {
-      await paymentSyncQueue.enqueue('assign_client', localId, { clientId });
+      await paymentSyncQueue.enqueue('assign_client', localId, {
+        clientId,
+        clientName: clientPatch.assignedClientName,
+      });
       if (useApiAuthStore.getState().isAuthenticated()) {
         void this.processQueue();
       }
@@ -232,6 +244,7 @@ export class PaymentRegisterService {
     try {
       await paymentRegisterApiService.assignClient(entry.remoteRegisterId, clientId);
       const updated = await paymentRegisterCacheRepository.updateByLocalId(localId, {
+        ...clientPatch,
         syncStatus: 'client_assigned',
         lastSyncError: null,
       });
@@ -242,7 +255,10 @@ export class PaymentRegisterService {
         lastSyncError: message,
         syncStatus: 'sync_failed',
       });
-      await paymentSyncQueue.enqueue('assign_client', localId, { clientId });
+      await paymentSyncQueue.enqueue('assign_client', localId, {
+        clientId,
+        clientName: clientPatch.assignedClientName,
+      });
       throw error;
     }
   }
@@ -366,11 +382,14 @@ export class PaymentRegisterService {
 
     if (type === 'assign_client') {
       const clientId = payload?.clientId as string | undefined;
+      const clientName = payload?.clientName as string | null | undefined;
       if (!clientId || !entry.remoteRegisterId) {
         throw new Error('Missing client or register');
       }
       await paymentRegisterApiService.assignClient(entry.remoteRegisterId, clientId);
       await paymentRegisterCacheRepository.updateByLocalId(localId, {
+        assignedClientId: clientId,
+        assignedClientName: clientName ?? null,
         syncStatus: 'client_assigned',
         lastSyncError: null,
       });

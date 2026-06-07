@@ -9,6 +9,7 @@ import { NOTIFICATION_PAGE_SIZE } from '@/constants/storage-keys';
 import { useAppFeedback } from '@/hooks/use-app-feedback';
 import {
   formatClearHistoryOutcome,
+  formatPackageHistoryRemovedOutcome,
   formatPurgeRetentionOutcome,
 } from '@/lib/feedback/format-operation-outcome';
 import { queryKeys } from '@/lib/query-keys';
@@ -104,12 +105,7 @@ export function useRemovePackageHistoryMutation() {
     mutationFn: (packageName: string) => notificationService.removePackageHistory(packageName),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
-      reportOutcome({
-        kind: 'clear_history',
-        status: 'completed',
-        title: 'Historial de app eliminado',
-        message: 'Las notificaciones de esa app fueron borradas localmente.',
-      });
+      reportOutcome(formatPackageHistoryRemovedOutcome());
     },
     onError: (error) =>
       reportError('clear_history', error, 'No se pudo eliminar el historial de la app.'),

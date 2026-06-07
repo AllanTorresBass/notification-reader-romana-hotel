@@ -1,5 +1,5 @@
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { forwardRef, useMemo, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { PrimaryButton } from '@/components/shared/PrimaryButton';
@@ -14,23 +14,56 @@ import { clientApiService } from '@/lib/api-client/clients/ClientApiService';
 import { reportError } from '@/lib/feedback/report-feedback';
 import { getUserErrorMessage } from '@/lib/utils/user-error-message';
 
+export const ASSIGN_CLIENT_SHEET_INITIAL_STATE = {
+  search: '',
+  showCreate: false,
+  fullName: '',
+  identityCard: '',
+  phone: '',
+  creating: false,
+  createError: null as string | null,
+};
+
 interface AssignClientSheetProps {
   onAssign: (clientId: string, clientName: string) => void;
   isAssigning: boolean;
   assigningClientId?: string | null;
+  /** Increment to clear search/create draft after a successful association. */
+  resetToken?: number;
 }
 
 export const AssignClientSheet = forwardRef<BottomSheet, AssignClientSheetProps>(
-  function AssignClientSheet({ onAssign, isAssigning, assigningClientId }, ref) {
+  function AssignClientSheet(
+    { onAssign, isAssigning, assigningClientId, resetToken = 0 },
+    ref
+  ) {
     const { colors } = useThemeColors();
     const snapPoints = useMemo(() => ['70%'], []);
-    const [search, setSearch] = useState('');
-    const [showCreate, setShowCreate] = useState(false);
-    const [fullName, setFullName] = useState('');
-    const [identityCard, setIdentityCard] = useState('');
-    const [phone, setPhone] = useState('');
-    const [creating, setCreating] = useState(false);
-    const [createError, setCreateError] = useState<string | null>(null);
+    const [search, setSearch] = useState(ASSIGN_CLIENT_SHEET_INITIAL_STATE.search);
+    const [showCreate, setShowCreate] = useState(ASSIGN_CLIENT_SHEET_INITIAL_STATE.showCreate);
+    const [fullName, setFullName] = useState(ASSIGN_CLIENT_SHEET_INITIAL_STATE.fullName);
+    const [identityCard, setIdentityCard] = useState(ASSIGN_CLIENT_SHEET_INITIAL_STATE.identityCard);
+    const [phone, setPhone] = useState(ASSIGN_CLIENT_SHEET_INITIAL_STATE.phone);
+    const [creating, setCreating] = useState(ASSIGN_CLIENT_SHEET_INITIAL_STATE.creating);
+    const [createError, setCreateError] = useState<string | null>(
+      ASSIGN_CLIENT_SHEET_INITIAL_STATE.createError
+    );
+
+    const resetForm = useCallback(() => {
+      setSearch(ASSIGN_CLIENT_SHEET_INITIAL_STATE.search);
+      setShowCreate(ASSIGN_CLIENT_SHEET_INITIAL_STATE.showCreate);
+      setFullName(ASSIGN_CLIENT_SHEET_INITIAL_STATE.fullName);
+      setIdentityCard(ASSIGN_CLIENT_SHEET_INITIAL_STATE.identityCard);
+      setPhone(ASSIGN_CLIENT_SHEET_INITIAL_STATE.phone);
+      setCreating(ASSIGN_CLIENT_SHEET_INITIAL_STATE.creating);
+      setCreateError(ASSIGN_CLIENT_SHEET_INITIAL_STATE.createError);
+    }, []);
+
+    useEffect(() => {
+      if (resetToken > 0) {
+        resetForm();
+      }
+    }, [resetToken, resetForm]);
 
     const { data, isLoading, isError, error, refetch } = useClientSearchQuery(search, !showCreate);
 
@@ -62,13 +95,18 @@ export const AssignClientSheet = forwardRef<BottomSheet, AssignClientSheetProps>
         index={-1}
         snapPoints={snapPoints}
         enablePanDownToClose
+        onChange={(index) => {
+          if (index === -1) {
+            resetForm();
+          }
+        }}
         backgroundStyle={{ backgroundColor: colors.surfaceElevated }}
         handleIndicatorStyle={{ backgroundColor: colors.textMuted }}
       >
         <BottomSheetScrollView contentContainerStyle={styles.content}>
-          <ThemedText variant="title">Asociar cliente</ThemedText>
+          <ThemedText variant="title">{copy.pagos.actions.assign.assignCta}</ThemedText>
           <ThemedText variant="caption" muted>
-            Busca por nombre o cédula. El teléfono del emisor no se usa.
+            {copy.clients.assignHint}
           </ThemedText>
 
           {!showCreate ? (
@@ -76,7 +114,7 @@ export const AssignClientSheet = forwardRef<BottomSheet, AssignClientSheetProps>
               <TextInput
                 value={search}
                 onChangeText={setSearch}
-                placeholder="Buscar cliente…"
+                placeholder={copy.clients.searchPlaceholder}
               />
               {isLoading ? <ActivityIndicator color={colors.primary} /> : null}
               {isError ? (
@@ -128,7 +166,7 @@ export const AssignClientSheet = forwardRef<BottomSheet, AssignClientSheetProps>
                 );
               })}
               <PrimaryButton
-                label="Crear cliente"
+                label={copy.clients.createCta}
                 variant="secondary"
                 onPress={() => setShowCreate(true)}
               />
@@ -138,21 +176,21 @@ export const AssignClientSheet = forwardRef<BottomSheet, AssignClientSheetProps>
               <TextInput
                 value={fullName}
                 onChangeText={setFullName}
-                placeholder="Nombre completo"
-                label="Nombre completo"
+                placeholder={copy.clients.fullNamePlaceholder}
+                label={copy.clients.fullNameLabel}
               />
               <TextInput
                 value={identityCard}
                 onChangeText={setIdentityCard}
-                placeholder="Cédula"
-                label="Cédula"
+                placeholder={copy.clients.identityPlaceholder}
+                label={copy.clients.identityLabel}
                 autoCapitalize="characters"
               />
               <TextInput
                 value={phone}
                 onChangeText={setPhone}
-                placeholder="Teléfono (opcional)"
-                label="Teléfono"
+                placeholder={copy.clients.phonePlaceholder}
+                label={copy.clients.phoneLabel}
                 keyboardType="phone-pad"
               />
               {createError ? (
@@ -161,14 +199,17 @@ export const AssignClientSheet = forwardRef<BottomSheet, AssignClientSheetProps>
                 </ThemedText>
               ) : null}
               <PrimaryButton
-                label={creating ? 'Creando…' : 'Guardar y asociar'}
+                label={creating ? copy.clients.creating : copy.clients.saveAndAssign}
                 onPress={() => void handleCreate()}
                 disabled={creating || isAssigning}
               />
               <PrimaryButton
-                label="Volver a buscar"
+                label={copy.clients.backToSearch}
                 variant="secondary"
-                onPress={() => setShowCreate(false)}
+                onPress={() => {
+                  setShowCreate(false);
+                  setCreateError(null);
+                }}
               />
             </>
           )}

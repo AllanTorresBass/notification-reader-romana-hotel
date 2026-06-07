@@ -72,7 +72,7 @@ export function ActivityLogPanel() {
           {isLoading ? <ActivityIndicator color={colors.primary} /> : null}
           {!isLoading && entries.length === 0 ? (
             <ThemedText variant="caption" muted>
-              {copy.feedback.noActivity}
+              {copy.feedback.activity.noActivity}
             </ThemedText>
           ) : null}
           {entries.map((entry) => (
@@ -101,7 +101,7 @@ export function ActivityLogPanel() {
           ))}
           {entries.length > 0 ? (
             <PrimaryButton
-              label={copy.feedback.clearActivity}
+              label={copy.feedback.activity.clearActivity}
               variant="secondary"
               onPress={() => void clearAll()}
             />

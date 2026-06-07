@@ -22,6 +22,8 @@ export const paymentRegisterCacheEntrySchema = z.object({
   notificationId: z.string().min(1),
   invoiceStatus: z.enum(['pending', 'paid']).nullable(),
   syncStatus: syncStatusSchema,
+  assignedClientId: z.string().nullable().optional().transform((v) => v ?? null),
+  assignedClientName: z.string().nullable().optional().transform((v) => v ?? null),
   lastSyncError: z.string().nullable(),
   createdAt: z.number(),
   updatedAt: z.number(),

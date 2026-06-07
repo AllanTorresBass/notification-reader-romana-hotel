@@ -21,6 +21,8 @@ export interface PaymentRegisterCacheEntry {
   notificationId: string;
   invoiceStatus: InvoiceStatus;
   syncStatus: SyncStatus;
+  assignedClientId: string | null;
+  assignedClientName: string | null;
   lastSyncError: string | null;
   createdAt: number;
   updatedAt: number;
