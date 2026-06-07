@@ -7,6 +7,7 @@ export default function OnboardingLayout() {
       <Stack.Screen name="access" />
       <Stack.Screen name="apps" />
       <Stack.Screen name="battery" />
+      <Stack.Screen name="connect" />
     </Stack>
   );
 }

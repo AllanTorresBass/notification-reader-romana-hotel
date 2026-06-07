@@ -1,14 +1,75 @@
 diff --git a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
-index 77e247a..1ddb19a 100644
+index 77e247a..7c9d134 100644
 --- a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
 +++ b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
-@@ -13,7 +13,45 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+@@ -9,15 +9,113 @@ import android.graphics.Canvas
+ import java.io.File
+ import java.io.FileOutputStream
+ 
++private fun charSequenceToString(value: CharSequence?): String {
++    return value?.toString()?.trim() ?: ""
++}
++
++private fun extractNotificationText(extras: android.os.Bundle): Triple<String, String, String> {
++    var title = charSequenceToString(extras.getCharSequence(Notification.EXTRA_TITLE))
++    var text = charSequenceToString(extras.getCharSequence(Notification.EXTRA_TEXT))
++    var bigText = charSequenceToString(extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
++
++    if (title.isEmpty()) {
++        title = charSequenceToString(extras.getCharSequence("android.title"))
++    }
++    if (text.isEmpty()) {
++        text = charSequenceToString(extras.getCharSequence("android.text"))
++    }
++    if (bigText.isEmpty()) {
++        bigText = charSequenceToString(extras.getCharSequence("android.bigText"))
++    }
++
++    val lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
++    if (lines != null && lines.isNotEmpty()) {
++        val joined = lines.joinToString(" ") { charSequenceToString(it) }.trim()
++        if (joined.isNotEmpty() && joined.length > bigText.length) {
++            bigText = joined
++        }
++    }
++
++    val messages = extras.getParcelableArray("android.messages")
++    if (messages != null && messages.isNotEmpty()) {
++        val messageText = messages.mapNotNull { parcel ->
++            (parcel as? android.os.Bundle)?.getCharSequence("text")?.toString()?.trim()
++        }.filter { it.isNotEmpty() }.joinToString(" ")
++        if (messageText.isNotEmpty() && messageText.length > bigText.length) {
++            bigText = messageText
++        }
++    }
++
++    if (text.isEmpty() && bigText.isNotEmpty()) {
++        text = bigText
++    }
++
++    return Triple(title, text, bigText)
++}
++
+ class ExpoNotificationListenerService : NotificationListenerService() {
      private var lastNotificationKey: String? = null
      private var lastNotificationTime: Long = 0
  
 +    companion object {
 +        @Volatile
 +        private var connectedInstance: ExpoNotificationListenerService? = null
++
++        fun isListenerConnected(): Boolean = connectedInstance != null
++
++        fun getActiveNotificationPayloads(): List<Map<String, Any>> {
++            val service = connectedInstance ?: return emptyList()
++            return try {
++                val active = service.activeNotifications ?: return emptyList()
++                active.mapNotNull { service.buildNotificationData(it) }
++            } catch (e: Exception) {
++                e.printStackTrace()
++                emptyList()
++            }
++        }
 +
 +        fun syncActiveNotifications(): Int {
 +            val service = connectedInstance ?: return 0
@@ -41,47 +102,89 @@ index 77e247a..1ddb19a 100644
 +    }
 +
      override fun onNotificationPosted(sbn: StatusBarNotification) {
+-        val moduleInstance = ExpoAndroidNotificationListenerServiceModule.getInstance() ?: return
 +        handleNotificationPosted(sbn, bypassDedupe = false)
 +    }
 +
-+    private fun handleNotificationPosted(sbn: StatusBarNotification, bypassDedupe: Boolean) {
-         val moduleInstance = ExpoAndroidNotificationListenerServiceModule.getInstance() ?: return
++    private fun buildNotificationData(sbn: StatusBarNotification): Map<String, Any>? {
++        val moduleInstance = ExpoAndroidNotificationListenerServiceModule.getInstance() ?: return null
++        if (!moduleInstance.isPackageAllowed(sbn.packageName)) {
++            return null
++        }
  
          val packageManager = applicationContext.packageManager
-@@ -36,15 +74,15 @@ class ExpoNotificationListenerService : NotificationListenerService() {
-                 return
+-        try {
++        return try {
+             val applicationInfo = packageManager.getApplicationInfo(sbn.packageName, 0)
+ 
+             val iconPath = try {
+@@ -32,40 +130,43 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+                 null
              }
  
+-            if (!moduleInstance.isPackageAllowed(sbn.packageName)) {
+-                return
+-            }
+-
 -            // Delete duplicate notification
 -            val currentTime = System.currentTimeMillis()
 -            if (sbn.key == lastNotificationKey && currentTime - lastNotificationTime < 500) {
 -                return
-+            if (!bypassDedupe) {
-+                val currentTime = System.currentTimeMillis()
-+                if (sbn.key == lastNotificationKey && currentTime - lastNotificationTime < 500) {
-+                    return
-+                }
-+                lastNotificationKey = sbn.key
-+                lastNotificationTime = currentTime
-             }
- 
+-            }
+-            
 -            lastNotificationKey = sbn.key
 -            lastNotificationTime = currentTime
 -
              val notification = sbn.notification
              val extras = notification.extras
++            val extracted = extractNotificationText(extras)
  
-@@ -62,7 +100,7 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+-            val notificationData = mapOf(
++            mapOf(
+                 "packageName" to sbn.packageName,
+                 "id" to sbn.id,
+-                "title" to (extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""),
+-                "text" to (extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""),
+-                "bigText" to (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""),
+-                "subText" to (extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""),
+-                "summaryText" to (extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT)?.toString() ?: ""),
++                "title" to extracted.first,
++                "text" to extracted.second,
++                "bigText" to extracted.third,
++                "subText" to (extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()?.trim() ?: ""),
++                "summaryText" to (extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT)?.toString()?.trim() ?: ""),
+                 "postTime" to sbn.postTime,
+                 "key" to sbn.key,
+                 "appName" to (packageManager.getApplicationLabel(applicationInfo)?.toString() ?: ""),
                  "appIconPath" to (iconPath ?: "")
              )
- 
+-            
 -            ExpoAndroidNotificationListenerServiceModule.getInstance()?.emitNotificationEvent(notificationData)
-+            moduleInstance.emitNotificationEvent(notificationData)
          } catch (e: Exception) {
              e.printStackTrace()
++            null
++        }
++    }
++
++    private fun handleNotificationPosted(sbn: StatusBarNotification, bypassDedupe: Boolean) {
++        val moduleInstance = ExpoAndroidNotificationListenerServiceModule.getInstance() ?: return
++
++        if (!bypassDedupe) {
++            val currentTime = System.currentTimeMillis()
++            if (sbn.key == lastNotificationKey && currentTime - lastNotificationTime < 500) {
++                return
++            }
++            lastNotificationKey = sbn.key
++            lastNotificationTime = currentTime
          }
++
++        val notificationData = buildNotificationData(sbn) ?: return
++        moduleInstance.emitNotificationEvent(notificationData)
+     }
+ 
+     private fun saveAppIconToStorage(drawable: Drawable?, packageName: String): String? {
 diff --git a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
-index 8c92037..b06020b 100644
+index 8c92037..dae7221 100644
 --- a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
 +++ b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
 @@ -7,8 +7,11 @@ import android.service.notification.StatusBarNotification
@@ -107,7 +210,7 @@ index 8c92037..b06020b 100644
 +        val prefs = context.getSharedPreferences(queuePrefsName, Context.MODE_PRIVATE)
 +        val existing = JSONArray(prefs.getString("queue", "[]") ?: "[]")
 +        val newArr = JSONArray()
-+        val startIndex = maxOf(0, existing.length() - 199)
++        val startIndex = maxOf(0, existing.length() - 499)
 +        for (i in startIndex until existing.length()) {
 +            newArr.put(existing.getJSONObject(i))
 +        }
@@ -152,7 +255,7 @@ index 8c92037..b06020b 100644
      
      override fun definition() = ModuleDefinition {
          Name("ExpoAndroidNotificationListenerService")
-@@ -54,6 +106,18 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
+@@ -54,6 +106,26 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
          Function("setAllowedPackages") { packages: List<String> ->
              allowedPackages = packages.toSet()
          }
@@ -168,10 +271,18 @@ index 8c92037..b06020b 100644
 +        Function("syncActiveNotifications") {
 +            ExpoNotificationListenerService.syncActiveNotifications()
 +        }
++
++        Function("getActiveNotifications") {
++            ExpoNotificationListenerService.getActiveNotificationPayloads()
++        }
++
++        Function("isListenerConnected") {
++            ExpoNotificationListenerService.isListenerConnected()
++        }
      }
  
      companion object {
-@@ -69,6 +133,7 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
+@@ -69,6 +141,7 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
      }
  
      fun emitNotificationEvent(notification: Map<String, Any>) {
@@ -179,3 +290,18 @@ index 8c92037..b06020b 100644
          mainHandler.post {
              try {
                  if (isReady.get()) {
+diff --git a/node_modules/expo-android-notification-listener-service/src/ExpoAndroidNotificationListenerServiceModule.ts b/node_modules/expo-android-notification-listener-service/src/ExpoAndroidNotificationListenerServiceModule.ts
+index 8480382..d793e1a 100644
+--- a/node_modules/expo-android-notification-listener-service/src/ExpoAndroidNotificationListenerServiceModule.ts
++++ b/node_modules/expo-android-notification-listener-service/src/ExpoAndroidNotificationListenerServiceModule.ts
+@@ -22,6 +22,10 @@ declare class ExpoAndroidNotificationListenerServiceModule extends EventEmitter<
+   isNotificationPermissionGranted(): boolean;
+   openNotificationListenerSettings(): void;
+   setAllowedPackages(packages: string[]): void;
++  pullQueuedNotifications(): NotificationData[];
++  syncActiveNotifications(): number;
++  getActiveNotifications(): NotificationData[];
++  isListenerConnected(): boolean;
+ }
+ 
+ export default requireNativeModule<ExpoAndroidNotificationListenerServiceModule>(

@@ -1,59 +1,42 @@
-import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { Pressable, ScrollView, StyleSheet } from 'react-native';
 
+import { ThemedText } from '@/components/ui/ThemedText';
 import { radius, spacing } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
-export interface FilterChipOption {
-  id: string;
-  label: string;
+interface FilterChipsProps<T extends string> {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
 }
 
-interface FilterChipsProps {
-  options: FilterChipOption[];
-  selectedId: string | null;
-  onSelect: (id: string | null) => void;
-}
-
-export function FilterChips({ options, selectedId, onSelect }: FilterChipsProps) {
+export function FilterChips<T extends string>({ options, value, onChange }: FilterChipsProps<T>) {
   const { colors } = useThemeColors();
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Show all apps"
-        onPress={() => onSelect(null)}
-        style={[
-          styles.chip,
-          {
-            backgroundColor: selectedId === null ? colors.accent : colors.chip,
-            borderColor: colors.border,
-          },
-        ]}
-      >
-        <Text style={{ color: selectedId === null ? '#FFF' : colors.text, fontWeight: '600' }}>
-          All
-        </Text>
-      </Pressable>
       {options.map((option) => {
-        const selected = selectedId === option.id;
+        const selected = option.value === value;
         return (
           <Pressable
-            key={option.id}
+            key={option.value}
             accessibilityRole="button"
-            accessibilityLabel={`Filter by ${option.label}`}
-            onPress={() => onSelect(option.id)}
+            accessibilityState={{ selected }}
+            onPress={() => onChange(option.value)}
             style={[
               styles.chip,
               {
-                backgroundColor: selected ? colors.accent : colors.chip,
-                borderColor: colors.border,
+                backgroundColor: selected ? colors.primary : colors.surfaceElevated,
+                borderColor: selected ? colors.primary : colors.border,
               },
             ]}
           >
-            <Text style={{ color: selected ? '#FFF' : colors.text, fontWeight: '600' }}>
+            <ThemedText
+              variant="label"
+              style={{ color: selected ? colors.primaryForeground : colors.text }}
+            >
               {option.label}
-            </Text>
+            </ThemedText>
           </Pressable>
         );
       })}
@@ -62,11 +45,11 @@ export function FilterChips({ options, selectedId, onSelect }: FilterChipsProps)
 }
 
 const styles = StyleSheet.create({
-  row: { gap: spacing.sm, paddingVertical: spacing.xs },
+  row: { gap: spacing.sm, paddingHorizontal: spacing.md },
   chip: {
     borderWidth: 1,
     borderRadius: radius.full,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
   },
 });

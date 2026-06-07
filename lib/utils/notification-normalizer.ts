@@ -1,6 +1,7 @@
 import type { NotificationData } from 'expo-android-notification-listener-service';
 
 import { generateRecordId } from '@/lib/utils/generate-id';
+import { extractReadableTexts } from '@/lib/utils/notification-text';
 
 import type { NotificationRecord } from '@/types/notification/notification.types';
 
@@ -12,9 +13,7 @@ export function normalizeNativeNotification(
   data: NotificationData,
   captureRawPayload: boolean
 ): Omit<NotificationRecord, 'id' | 'createdAt' | 'updatedAt' | 'dismissedAt'> {
-  const title = data.title?.trim() || data.subText?.trim() || null;
-  const bigText = data.bigText?.trim() || null;
-  const body = data.text?.trim() || bigText || data.summaryText?.trim() || null;
+  const { title, body, bigText } = extractReadableTexts(data);
   const hasVisibleContent = Boolean(title || body || bigText);
   const isRedacted = !hasVisibleContent && Boolean(data.packageName);
 

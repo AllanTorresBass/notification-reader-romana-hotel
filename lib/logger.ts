@@ -34,3 +34,9 @@ export const logger = {
     }
   },
 };
+
+export const uxLogger = {
+  event(name: string, context?: Record<string, unknown>): void {
+    logger.info(`ux.${name}`, context);
+  },
+};

@@ -11,7 +11,8 @@ export function useInstalledAppsQuery(search: string) {
     queryKey: [...queryKeys.installedApps.all, search] as const,
     queryFn: () => installedAppsService.search(search),
     meta: {
-      onError: (error: unknown) => handleFetchError(error, 'Could not load apps'),
+      onError: (error: unknown) =>
+        handleFetchError(error, 'No pudimos listar las apps instaladas.'),
     },
   });
 }

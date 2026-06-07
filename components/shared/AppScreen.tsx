@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Image, ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ThemedText } from '@/components/ui/ThemedText';
 import { spacing } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
@@ -12,6 +13,7 @@ interface AppScreenProps {
   scroll?: boolean;
   headerRight?: ReactNode;
   contentStyle?: ViewStyle;
+  logo?: number;
 }
 
 export function AppScreen({
@@ -21,6 +23,7 @@ export function AppScreen({
   scroll = true,
   headerRight,
   contentStyle,
+  logo,
 }: AppScreenProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useThemeColors();
@@ -28,9 +31,12 @@ export function AppScreen({
   const header = title ? (
     <View style={styles.headerRow}>
       <View style={styles.headerText}>
-        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+        {logo ? <Image source={logo} style={styles.logo} resizeMode="contain" /> : null}
+        <ThemedText variant="heading">{title}</ThemedText>
         {subtitle ? (
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text>
+          <ThemedText variant="subtitle" muted>
+            {subtitle}
+          </ThemedText>
         ) : null}
       </View>
       {headerRight}
@@ -78,8 +84,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   headerText: { flex: 1, gap: spacing.xs },
-  title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
-  subtitle: { fontSize: 14, lineHeight: 20 },
+  logo: { width: 40, height: 40, marginBottom: spacing.xs },
   content: { paddingHorizontal: spacing.md, gap: spacing.md },
   contentFlex: { flex: 1, paddingHorizontal: spacing.md, gap: spacing.md },
 });

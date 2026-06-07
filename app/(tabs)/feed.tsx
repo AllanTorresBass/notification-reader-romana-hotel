@@ -1,98 +1,188 @@
+import { useQueryClient } from '@tanstack/react-query';
 import BottomSheet from '@gorhom/bottom-sheet';
 import { FlashList } from '@shopify/flash-list';
+import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
-  ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native';
 
-import { NotificationCard } from '@/components/notifications/NotificationCard';
-import { NotificationDetailSheet } from '@/components/notifications/NotificationDetailSheet';
+import { AssignClientSheet } from '@/components/payments/AssignClientSheet';
+import { ManualRegisterForm } from '@/components/payments/ManualRegisterForm';
+import { PaymentDetailSheet } from '@/components/payments/PaymentDetailSheet';
+import { PaymentRegisterCard } from '@/components/payments/PaymentRegisterCard';
 import { AppScreen } from '@/components/shared/AppScreen';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { FilterChips } from '@/components/shared/FilterChips';
+import { PrimaryButton } from '@/components/shared/PrimaryButton';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';
+import { Banner } from '@/components/ui/Banner';
+import { copy } from '@/constants/copy';
 import { spacing } from '@/constants/theme';
+import { useGlobalErrorHandler } from '@/hooks/use-global-error-handler';
+import { useApiAuthStatus, useIsApiAuthenticated, useLastSyncError } from '@/hooks/use-api-auth';
+import {
+  useAssignClientMutation,
+  useConfirmPaymentMutation,
+  usePaymentRegistersInfiniteQuery,
+  usePendingLocalSyncCountQuery,
+} from '@/hooks/use-payment-registers';
 import { useNotificationShadeSync } from '@/hooks/use-notification-shade-sync';
-import { useNotificationsInfiniteQuery } from '@/hooks/use-notifications';
 import { useThemeColors } from '@/hooks/use-theme-colors';
-import { groupNotificationsByDate } from '@/lib/utils/group-notifications';
-import type { NotificationRecord } from '@/types/notification/notification.types';
-import { useWhitelistStore } from '@/stores/whitelist-store';
+import { queryKeys } from '@/lib/query-keys';
+import { uxLogger } from '@/lib/logger';
+import { paymentRegisterService } from '@/lib/services/payments/PaymentRegisterService';
+import { paymentSyncOrchestrator } from '@/lib/services/payments/PaymentSyncOrchestrator';
+import { normalizePagoAmount } from '@/lib/utils/bdv-pagomovil-parser';
+import type { PaymentRegisterCacheEntry } from '@/types/payment/payment-register-cache.types';
 
-type ListItem =
-  | { type: 'header'; title: string; key: string }
-  | { type: 'notification'; record: NotificationRecord; key: string };
-
-export default function FeedScreen() {
+export default function PagosScreen() {
+  const router = useRouter();
   const { colors } = useThemeColors();
-  const appLabels = useWhitelistStore((s) => s.appLabels);
-  const allowedPackages = useWhitelistStore((s) => s.allowedPackages);
-  const [search, setSearch] = useState('');
-  const [packageFilter, setPackageFilter] = useState<string | null>(null);
-  const [selected, setSelected] = useState<NotificationRecord | null>(null);
-  const sheetRef = useRef<BottomSheet>(null);
+  const queryClient = useQueryClient();
+  const { handleCrudError, showSuccess } = useGlobalErrorHandler();
+  const isAuthenticated = useIsApiAuthenticated();
+  const authStatus = useApiAuthStatus();
+  const lastSyncError = useLastSyncError();
+  const [selected, setSelected] = useState<PaymentRegisterCacheEntry | null>(null);
+  const [showManual, setShowManual] = useState(false);
+  const [manualName, setManualName] = useState('');
+  const [manualPago, setManualPago] = useState('');
+  const [manualMobile, setManualMobile] = useState('');
+  const [manualRef, setManualRef] = useState('');
+  const [manualDate, setManualDate] = useState('');
+  const [manualTime, setManualTime] = useState('');
+  const [manualSubmitting, setManualSubmitting] = useState(false);
 
-  const filters = useMemo(
-    () => ({
-      search: search || undefined,
-      packageName: packageFilter ?? undefined,
-    }),
-    [search, packageFilter]
-  );
+  const detailRef = useRef<BottomSheet>(null);
+  const assignRef = useRef<BottomSheet>(null);
 
-  const { syncFromShade, canSync } = useNotificationShadeSync();
-  const { data, isLoading, isFetchingNextPage, fetchNextPage, hasNextPage, refetch, isRefetching } =
-    useNotificationsInfiniteQuery(filters);
+  const { data, isLoading, fetchNextPage, hasNextPage, refetch, isRefetching } =
+    usePaymentRegistersInfiniteQuery();
+  const confirmPayment = useConfirmPaymentMutation();
+  const assignClient = useAssignClientMutation();
+  const { data: pendingLocalSync = 0 } = usePendingLocalSyncCountQuery();
+  const { syncFromShade } = useNotificationShadeSync();
 
-  const refreshFeed = useCallback(async () => {
-    if (canSync) {
-      await syncFromShade();
-    }
-    await refetch();
-  }, [canSync, syncFromShade, refetch]);
-
-  const records = useMemo(
+  const entries = useMemo(
     () => data?.pages.flatMap((page) => page.items) ?? [],
     [data]
   );
 
-  const listItems = useMemo((): ListItem[] => {
-    const sections = groupNotificationsByDate(records);
-    const items: ListItem[] = [];
-    for (const section of sections) {
-      items.push({ type: 'header', title: section.title, key: `h-${section.title}` });
-      for (const record of section.data) {
-        items.push({ type: 'notification', record, key: record.id });
-      }
+  const banner = useMemo(() => {
+    if (authStatus === 'expired' || lastSyncError) {
+      return {
+        message: lastSyncError ?? copy.pagos.sessionExpired,
+        variant: 'warning' as const,
+        actionLabel: copy.pagos.goToSettings,
+        onAction: () => {
+          uxLogger.event('auth_redirect', { source: 'pagos_banner' });
+          router.push('/(tabs)/settings');
+        },
+      };
     }
-    return items;
-  }, [records]);
+    if (!isAuthenticated) {
+      return {
+        message: copy.pagos.connectPrompt,
+        variant: 'info' as const,
+        actionLabel: copy.pagos.goToSettings,
+        onAction: () => router.push('/(tabs)/settings'),
+      };
+    }
+    if (pendingLocalSync > 0) {
+      return {
+        message: copy.pagos.pendingSync(pendingLocalSync),
+        variant: 'info' as const,
+      };
+    }
+    return null;
+  }, [authStatus, isAuthenticated, lastSyncError, pendingLocalSync, router]);
 
-  const chipOptions = useMemo(
-    () =>
-      allowedPackages.map((pkg) => ({
-        id: pkg,
-        label: appLabels[pkg] ?? pkg.split('.').pop() ?? pkg,
-      })),
-    [allowedPackages, appLabels]
+  const openDetail = useCallback((entry: PaymentRegisterCacheEntry) => {
+    setSelected(entry);
+    detailRef.current?.expand();
+  }, []);
+
+  const refresh = useCallback(async () => {
+    await syncFromShade();
+    await paymentSyncOrchestrator.runSync(isAuthenticated ? 'manual' : 'notification');
+    await refetch();
+    await queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.lists() });
+  }, [isAuthenticated, queryClient, refetch, syncFromShade]);
+
+  const handleConfirmPayment = useCallback(() => {
+    if (!selected) return;
+    confirmPayment.mutate(selected.localId, {
+      onSuccess: (updated) => {
+        if (updated) setSelected(updated);
+        showSuccess('Pago confirmado');
+      },
+      onError: (error) => handleCrudError(error, 'No se pudo confirmar el pago.'),
+    });
+  }, [selected, confirmPayment, handleCrudError, showSuccess]);
+
+  const handleAssignClient = useCallback(() => {
+    detailRef.current?.close();
+    assignRef.current?.expand();
+  }, []);
+
+  const handleAssign = useCallback(
+    (clientId: string) => {
+      if (!selected) return;
+      assignClient.mutate(
+        { localId: selected.localId, clientId },
+        {
+          onSuccess: (updated) => {
+            assignRef.current?.close();
+            if (updated) setSelected(updated);
+            showSuccess('Cliente asociado');
+          },
+          onError: (error) => handleCrudError(error, 'No se pudo asociar el cliente.'),
+        }
+      );
+    },
+    [selected, assignClient, handleCrudError, showSuccess]
   );
 
-  const openDetail = useCallback((record: NotificationRecord) => {
-    setSelected(record);
-    sheetRef.current?.expand();
-  }, []);
+  const submitManual = useCallback(async () => {
+    setManualSubmitting(true);
+    try {
+      const pago = normalizePagoAmount(manualPago);
+      await paymentRegisterService.createManual({
+        name: manualName.trim() || null,
+        pago,
+        mobile: manualMobile.trim(),
+        ref: manualRef.trim(),
+        paymentDate: manualDate.trim(),
+        paymentTime: manualTime.trim(),
+      });
+      setShowManual(false);
+      uxLogger.event('manual_register_opened', { success: true });
+      showSuccess('Pago registrado');
+      await refetch();
+    } catch (error) {
+      handleCrudError(error, 'No se pudo registrar el pago.');
+    } finally {
+      setManualSubmitting(false);
+    }
+  }, [
+    manualName,
+    manualPago,
+    manualMobile,
+    manualRef,
+    manualDate,
+    manualTime,
+    refetch,
+    handleCrudError,
+    showSuccess,
+  ]);
 
   if (isLoading) {
     return (
-      <AppScreen title="Feed" subtitle="Loading notifications..." scroll={false}>
+      <AppScreen title={copy.pagos.title} subtitle={copy.pagos.loading} scroll={false}>
         <View style={styles.skeletons}>
-          <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
         </View>
@@ -101,120 +191,93 @@ export default function FeedScreen() {
   }
 
   return (
-    <AppScreen
-      title="Feed"
-      subtitle={`${records.length} shown`}
-      scroll={false}
-      contentStyle={styles.feedContent}
-    >
-      <TextInput
-        accessibilityLabel="Search notifications"
-        placeholder="Search..."
-        placeholderTextColor={colors.textMuted}
-        value={search}
-        onChangeText={setSearch}
-        style={[
-          styles.search,
-          { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface },
-        ]}
-      />
-      <FilterChips
-        options={chipOptions}
-        selectedId={packageFilter}
-        onSelect={setPackageFilter}
-      />
-      {listItems.length === 0 ? (
-        <ScrollView
-          contentContainerStyle={styles.emptyScroll}
+    <AppScreen title={copy.pagos.title} subtitle={copy.pagos.subtitle} scroll={false}>
+      {banner ? (
+        <Banner
+          message={banner.message}
+          variant={banner.variant}
+          actionLabel={banner.actionLabel}
+          onAction={banner.onAction}
+        />
+      ) : null}
+
+      {showManual ? (
+        <ManualRegisterForm
+          name={manualName}
+          pago={manualPago}
+          mobile={manualMobile}
+          ref={manualRef}
+          paymentDate={manualDate}
+          paymentTime={manualTime}
+          onChangeName={setManualName}
+          onChangePago={setManualPago}
+          onChangeMobile={setManualMobile}
+          onChangeRef={setManualRef}
+          onChangePaymentDate={setManualDate}
+          onChangePaymentTime={setManualTime}
+          onSubmit={() => {
+            uxLogger.event('manual_register_opened');
+            void submitManual();
+          }}
+          isSubmitting={manualSubmitting}
+        />
+      ) : null}
+
+      {entries.length === 0 && !showManual ? (
+        <EmptyState
+          title={copy.pagos.emptyTitle}
+          description={copy.pagos.emptyDescription}
+          action={
+            <PrimaryButton
+              label={copy.pagos.manualRegister}
+              onPress={() => setShowManual(true)}
+            />
+          }
+        />
+      ) : (
+        <FlashList
+          data={entries}
+          keyExtractor={(item) => item.localId}
+          contentContainerStyle={styles.list}
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
-              onRefresh={() => void refreshFeed()}
-              tintColor={colors.accent}
+              onRefresh={() => void refresh()}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
             />
           }
-        >
-          <EmptyState
-            title="No notifications yet"
-            description={
-              canSync
-                ? 'Pull down to sync alerts still in your notification shade. Cleared alerts cannot be recovered on Android.'
-                : 'Enable notification access and whitelist an app in the Apps tab.'
-            }
-          />
-        </ScrollView>
-      ) : (
-        <View style={styles.listContainer}>
-          <FlashList
-            data={listItems}
-            keyExtractor={(item) => item.key}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefetching}
-                onRefresh={() => void refreshFeed()}
-                tintColor={colors.accent}
-              />
-            }
-            onEndReached={() => {
-              if (hasNextPage && !isFetchingNextPage) {
-                void fetchNextPage();
-              }
-            }}
-            onEndReachedThreshold={0.3}
-            renderItem={({ item }) => {
-              if (item.type === 'header') {
-                return (
-                  <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-                    {item.title}
-                  </Text>
-                );
-              }
-              return (
-                <View style={styles.cardWrap}>
-                  <NotificationCard record={item.record} onPress={openDetail} />
-                </View>
-              );
-            }}
-            ListFooterComponent={
-              isFetchingNextPage ? (
-                <ActivityIndicator color={colors.accent} style={styles.footer} />
-              ) : null
-            }
-          />
-        </View>
+          onEndReached={() => {
+            if (hasNextPage) void fetchNextPage();
+          }}
+          renderItem={({ item }) => (
+            <PaymentRegisterCard entry={item} onPress={openDetail} />
+          )}
+          ListFooterComponent={
+            hasNextPage ? <ActivityIndicator color={colors.primary} style={styles.footer} /> : null
+          }
+        />
       )}
-      <NotificationDetailSheet
-        ref={sheetRef}
-        record={selected}
-        onClose={() => {
-          setSelected(null);
-          sheetRef.current?.close();
-        }}
+
+      <PaymentDetailSheet
+        ref={detailRef}
+        entry={selected}
+        onConfirmPayment={handleConfirmPayment}
+        onAssignClient={handleAssignClient}
+        isConfirming={confirmPayment.isPending}
+      />
+
+      <AssignClientSheet
+        ref={assignRef}
+        onAssign={handleAssign}
+        isAssigning={assignClient.isPending}
       />
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  feedContent: { flex: 1 },
-  search: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: 16,
-    marginBottom: spacing.sm,
-  },
-  listContainer: { flex: 1, minHeight: 300 },
-  emptyScroll: { flexGrow: 1, justifyContent: 'center' },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginVertical: spacing.sm,
-  },
-  cardWrap: { marginBottom: spacing.sm },
-  skeletons: { gap: spacing.sm, padding: spacing.md },
-  footer: { padding: spacing.md },
+  skeletons: { gap: spacing.md, padding: spacing.md },
+  list: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
+  footer: { paddingVertical: spacing.md },
 });

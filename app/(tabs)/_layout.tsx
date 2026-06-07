@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Bell, Settings, Smartphone } from 'lucide-react-native';
 
+import { copy } from '@/constants/copy';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
 export default function TabLayout() {
@@ -10,7 +11,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.accent,
+        tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
           backgroundColor: colors.surface,
@@ -22,21 +23,21 @@ export default function TabLayout() {
       <Tabs.Screen
         name="feed"
         options={{
-          title: 'Feed',
+          title: copy.tabs.pagos,
           tabBarIcon: ({ color, size }) => <Bell color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="apps"
         options={{
-          title: 'Apps',
+          title: copy.tabs.bdv,
           tabBarIcon: ({ color, size }) => <Smartphone color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
+          title: copy.tabs.ajustes,
           tabBarIcon: ({ color, size }) => <Settings color={color} size={size} />,
         }}
       />

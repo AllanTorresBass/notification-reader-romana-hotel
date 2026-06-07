@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { STORAGE_KEYS } from '@/constants/storage-keys';
+import {
+  ALLOWED_PACKAGES,
+  APP_LABELS,
+} from '@/constants/whitelist-defaults';
 import { createZustandSecureStorage } from '@/lib/storage/zustand-secure-storage';
 
 interface WhitelistState {
@@ -17,49 +21,25 @@ interface WhitelistState {
 
 export const useWhitelistStore = create<WhitelistState>()(
   persist(
-    (set, get) => ({
-      allowedPackages: [],
-      appLabels: {},
+    (set, _get) => ({
+      allowedPackages: [...ALLOWED_PACKAGES],
+      appLabels: { ...APP_LABELS },
       hasCompletedOnboarding: false,
-      togglePackage: (packageName, appLabel) => {
-        const { allowedPackages, appLabels } = get();
-        const isSelected = allowedPackages.includes(packageName);
-        if (isSelected) {
-          const nextPackages = allowedPackages.filter((p) => p !== packageName);
-          const nextLabels = { ...appLabels };
-          delete nextLabels[packageName];
-          set({ allowedPackages: nextPackages, appLabels: nextLabels });
-          return;
-        }
-        set({
-          allowedPackages: [...allowedPackages, packageName],
-          appLabels: { ...appLabels, [packageName]: appLabel },
-        });
-      },
-      setAppLabel: (packageName, appLabel) => {
-        set({ appLabels: { ...get().appLabels, [packageName]: appLabel } });
-      },
-      addManualPackage: (packageName, appLabel) => {
-        const trimmed = packageName.trim();
-        if (!trimmed || get().allowedPackages.includes(trimmed)) {
-          return;
-        }
-        set({
-          allowedPackages: [...get().allowedPackages, trimmed],
-          appLabels: { ...get().appLabels, [trimmed]: appLabel.trim() || trimmed },
-        });
-      },
-      removePackage: (packageName) => {
-        const nextPackages = get().allowedPackages.filter((p) => p !== packageName);
-        const nextLabels = { ...get().appLabels };
-        delete nextLabels[packageName];
-        set({ allowedPackages: nextPackages, appLabels: nextLabels });
-      },
+      togglePackage: () => {},
+      setAppLabel: () => {},
+      addManualPackage: () => {},
+      removePackage: () => {},
       setOnboardingComplete: (hasCompletedOnboarding) => set({ hasCompletedOnboarding }),
     }),
     {
       name: 'whitelist-store',
       storage: createJSONStorage(() => createZustandSecureStorage(STORAGE_KEYS.whitelist)),
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...(typeof persistedState === 'object' && persistedState !== null ? persistedState : {}),
+        allowedPackages: [...ALLOWED_PACKAGES],
+        appLabels: { ...APP_LABELS },
+      }),
     }
   )
 );

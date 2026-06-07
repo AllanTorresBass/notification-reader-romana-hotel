@@ -2,15 +2,15 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { DEFAULT_RETENTION_DAYS } from '@/constants/storage-keys';
-import type { ThemeMode } from '@/constants/theme';
+import type { ThemePreference } from '@/constants/theme';
 import { STORAGE_KEYS } from '@/constants/storage-keys';
 import { createZustandSecureStorage } from '@/lib/storage/zustand-secure-storage';
 
 interface PreferencesState {
-  theme: ThemeMode;
+  theme: ThemePreference;
   retentionDays: number;
   captureRawPayload: boolean;
-  setTheme: (theme: ThemeMode) => void;
+  setTheme: (theme: ThemePreference) => void;
   setRetentionDays: (days: number) => void;
   setCaptureRawPayload: (enabled: boolean) => void;
 }

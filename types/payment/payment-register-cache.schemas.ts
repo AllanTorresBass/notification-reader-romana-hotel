@@ -1,0 +1,48 @@
+import { z } from 'zod';
+
+export const syncStatusSchema = z.enum([
+  'pending_sync',
+  'synced',
+  'payment_confirmed',
+  'client_assigned',
+  'sync_failed',
+]);
+
+export const paymentRegisterCacheEntrySchema = z.object({
+  localId: z.string().min(1),
+  remoteRegisterId: z.string().nullable(),
+  remoteInvoiceId: z.string().nullable(),
+  name: z.string().nullable(),
+  pago: z.string().min(1),
+  mobile: z.string().min(1),
+  ref: z.string(),
+  paymentDate: z.string(),
+  paymentTime: z.string(),
+  notificationKey: z.string().min(1),
+  notificationId: z.string().min(1),
+  invoiceStatus: z.enum(['pending', 'paid']).nullable(),
+  syncStatus: syncStatusSchema,
+  lastSyncError: z.string().nullable(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+
+export const paymentRegisterStoreEnvelopeSchema = z.object({
+  version: z.literal(1),
+  entries: z.array(paymentRegisterCacheEntrySchema),
+});
+
+export const paymentSyncJobSchema = z.object({
+  id: z.string().min(1),
+  type: z.enum(['create_register', 'confirm_payment', 'assign_client', 'pull_registers']),
+  localId: z.string().min(1),
+  payload: z.record(z.string(), z.unknown()).optional(),
+  attempts: z.number().int().min(0),
+  nextRetryAt: z.number(),
+  createdAt: z.number(),
+});
+
+export const paymentSyncQueueEnvelopeSchema = z.object({
+  version: z.literal(1),
+  jobs: z.array(paymentSyncJobSchema),
+});

@@ -55,9 +55,9 @@ export function useClearHistoryMutation() {
     mutationFn: () => notificationService.clearHistory(),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
-      showSuccess('History cleared');
+      showSuccess('Historial borrado');
     },
-    onError: (error) => handleCrudError(error, 'Could not clear history'),
+    onError: (error) => handleCrudError(error, 'No se pudo borrar el historial.'),
   });
 }
 
@@ -70,9 +70,12 @@ export function usePurgeRetentionMutation() {
     mutationFn: () => notificationService.purgeRetention(retentionDays),
     onSuccess: async (removed) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
-      showSuccess('Retention applied', removed > 0 ? `${removed} removed` : 'No old items');
+      showSuccess(
+        'Retención aplicada',
+        removed > 0 ? `${removed} eliminados` : 'Sin registros antiguos'
+      );
     },
-    onError: (error) => handleCrudError(error, 'Could not apply retention'),
+    onError: (error) => handleCrudError(error, 'No se pudo aplicar la retención.'),
   });
 }
 
@@ -84,8 +87,8 @@ export function useRemovePackageHistoryMutation() {
     mutationFn: (packageName: string) => notificationService.removePackageHistory(packageName),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
-      showSuccess('Package history removed');
+      showSuccess('Historial de la app eliminado');
     },
-    onError: (error) => handleCrudError(error, 'Could not remove package history'),
+    onError: (error) => handleCrudError(error, 'No se pudo eliminar el historial de la app.'),
   });
 }

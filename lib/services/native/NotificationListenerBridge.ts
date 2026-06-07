@@ -73,6 +73,42 @@ export class NotificationListenerBridge {
     }
   }
 
+  getActiveNotifications(): NotificationData[] {
+    if (!this.isSupported()) {
+      return [];
+    }
+    try {
+      const mod = ExpoAndroidNotificationListenerService as typeof ExpoAndroidNotificationListenerService & {
+        getActiveNotifications?: () => NotificationData[];
+      };
+      if (typeof mod.getActiveNotifications !== 'function') {
+        return [];
+      }
+      return mod.getActiveNotifications();
+    } catch (error) {
+      logger.error('Failed to read active notifications from shade', { error: String(error) });
+      return [];
+    }
+  }
+
+  isListenerConnected(): boolean {
+    if (!this.isSupported()) {
+      return false;
+    }
+    try {
+      const mod = ExpoAndroidNotificationListenerService as typeof ExpoAndroidNotificationListenerService & {
+        isListenerConnected?: () => boolean;
+      };
+      if (typeof mod.isListenerConnected !== 'function') {
+        return false;
+      }
+      return mod.isListenerConnected();
+    } catch (error) {
+      logger.error('Failed to check notification listener connection', { error: String(error) });
+      return false;
+    }
+  }
+
   subscribe(
     handler: (notification: NotificationData) => void
   ): EventSubscription | null {

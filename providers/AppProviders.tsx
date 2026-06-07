@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { useNotificationListener } from '@/hooks/use-notification-listener';
+import { usePaymentSyncHost } from '@/hooks/use-payment-sync-host';
 import { notificationService } from '@/lib/services/notifications/NotificationService';
 import { usePreferencesStore } from '@/stores/preferences-store';
 
@@ -13,6 +14,7 @@ interface AppProvidersProps {
 
 function NotificationListenerHost() {
   useNotificationListener();
+  usePaymentSyncHost();
 
   useEffect(() => {
     const retentionDays = usePreferencesStore.getState().retentionDays;

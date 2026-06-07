@@ -1,6 +1,7 @@
 import { Redirect } from 'expo-router';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { ThemedText } from '@/components/ui/ThemedText';
 import { useAppGates } from '@/hooks/use-app-gates';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
@@ -11,10 +12,10 @@ export default function IndexScreen() {
   if (!isAndroid) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Android only</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          Notification Reader requires an Android device with notification listener access.
-        </Text>
+        <ThemedText variant="title">Solo Android</ThemedText>
+        <ThemedText variant="body" muted style={styles.subtitle}>
+          KD-Gym Pagos requiere un dispositivo Android con acceso a notificaciones.
+        </ThemedText>
       </View>
     );
   }
@@ -22,7 +23,7 @@ export default function IndexScreen() {
   if (accessLoading) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <ActivityIndicator color={colors.accent} size="large" />
+        <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
   }
@@ -46,6 +47,5 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 12,
   },
-  title: { fontSize: 22, fontWeight: '700', textAlign: 'center' },
-  subtitle: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
+  subtitle: { textAlign: 'center' },
 });
