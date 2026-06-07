@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { KdGymLogo } from '@/components/brand/KdGymLogo';
+import { FeedbackInline } from '@/components/feedback/FeedbackInline';
 import { AppScreen } from '@/components/shared/AppScreen';
 import { KD_GYM_DEFAULT_API_URL } from '@/constants/api-defaults';
 import { PrimaryButton } from '@/components/shared/PrimaryButton';
@@ -44,7 +45,7 @@ export default function OnboardingConnectScreen() {
       reportLoginSuccess();
       finish();
     } catch (e) {
-      reportLoginError(e, { toast: false, log: true });
+      reportLoginError(e, { presentationContext: { anchor: 'form' } });
       setError(getUserErrorMessage(e, 'action', 'Error de conexión').message);
     }
   };
@@ -88,11 +89,7 @@ export default function OnboardingConnectScreen() {
         label="Contraseña"
         secureTextEntry
       />
-      {error ? (
-        <ThemedText variant="caption" style={{ color: colors.danger }}>
-          {error}
-        </ThemedText>
-      ) : null}
+      {error ? <FeedbackInline message={error} tone="error" /> : null}
       {login.isPending ? <ActivityIndicator color={colors.primary} /> : null}
       <PrimaryButton
         label="Conectar y continuar"

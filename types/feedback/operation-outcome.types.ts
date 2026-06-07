@@ -19,6 +19,8 @@ export type OperationKind =
   | 'notification_list_fetch'
   | 'purge_retention'
   | 'create_client'
+  | 'create_invoice'
+  | 'invoice_list_fetch'
   | 'client_search'
   | 'access_check'
   | 'onboarding_skip';

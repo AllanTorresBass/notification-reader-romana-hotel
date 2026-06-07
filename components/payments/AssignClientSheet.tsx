@@ -2,6 +2,7 @@ import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { forwardRef, useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { FeedbackInline } from '@/components/feedback/FeedbackInline';
 import { PrimaryButton } from '@/components/shared/PrimaryButton';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { TextInput } from '@/components/ui/TextInput';
@@ -26,6 +27,7 @@ export const ASSIGN_CLIENT_SHEET_INITIAL_STATE = {
 
 interface AssignClientSheetProps {
   onAssign: (clientId: string, clientName: string) => void;
+  onBack?: () => void;
   isAssigning: boolean;
   assigningClientId?: string | null;
   /** Increment to clear search/create draft after a successful association. */
@@ -34,7 +36,7 @@ interface AssignClientSheetProps {
 
 export const AssignClientSheet = forwardRef<BottomSheet, AssignClientSheetProps>(
   function AssignClientSheet(
-    { onAssign, isAssigning, assigningClientId, resetToken = 0 },
+    { onAssign, onBack, isAssigning, assigningClientId, resetToken = 0 },
     ref
   ) {
     const { colors } = useThemeColors();
@@ -80,8 +82,7 @@ export const AssignClientSheet = forwardRef<BottomSheet, AssignClientSheetProps>
         onAssign(client.id, client.fullName);
       } catch (e) {
         reportError('create_client', e, 'No se pudo crear el cliente.', 'action', {
-          toast: false,
-          log: true,
+          presentationContext: { anchor: 'form' },
         });
         setCreateError(getUserErrorMessage(e, 'action', 'No se pudo crear el cliente.').message);
       } finally {
@@ -104,6 +105,13 @@ export const AssignClientSheet = forwardRef<BottomSheet, AssignClientSheetProps>
         handleIndicatorStyle={{ backgroundColor: colors.textMuted }}
       >
         <BottomSheetScrollView contentContainerStyle={styles.content}>
+          {onBack ? (
+            <Pressable accessibilityRole="button" onPress={onBack} style={styles.backRow}>
+              <ThemedText variant="label" style={{ color: colors.primary }}>
+                ← {copy.pagos.assignBack}
+              </ThemedText>
+            </Pressable>
+          ) : null}
           <ThemedText variant="title">{copy.pagos.actions.assign.assignCta}</ThemedText>
           <ThemedText variant="caption" muted>
             {copy.clients.assignHint}
@@ -119,9 +127,10 @@ export const AssignClientSheet = forwardRef<BottomSheet, AssignClientSheetProps>
               {isLoading ? <ActivityIndicator color={colors.primary} /> : null}
               {isError ? (
                 <View style={styles.errorBlock}>
-                  <ThemedText variant="caption" style={{ color: colors.danger }}>
-                    {getUserErrorMessage(error, 'fetch', copy.clients.searchError).message}
-                  </ThemedText>
+                  <FeedbackInline
+                    message={getUserErrorMessage(error, 'fetch', copy.clients.searchError).message}
+                    tone="error"
+                  />
                   <PrimaryButton
                     label={copy.clients.retry}
                     variant="secondary"
@@ -193,11 +202,7 @@ export const AssignClientSheet = forwardRef<BottomSheet, AssignClientSheetProps>
                 label={copy.clients.phoneLabel}
                 keyboardType="phone-pad"
               />
-              {createError ? (
-                <ThemedText variant="caption" style={{ color: colors.danger }}>
-                  {createError}
-                </ThemedText>
-              ) : null}
+              {createError ? <FeedbackInline message={createError} tone="error" /> : null}
               <PrimaryButton
                 label={creating ? copy.clients.creating : copy.clients.saveAndAssign}
                 onPress={() => void handleCreate()}
@@ -221,6 +226,7 @@ export const AssignClientSheet = forwardRef<BottomSheet, AssignClientSheetProps>
 
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
+  backRow: { alignSelf: 'flex-start' },
   clientRow: {
     borderWidth: 1,
     borderRadius: radius.lg,

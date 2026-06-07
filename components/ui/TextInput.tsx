@@ -5,6 +5,7 @@ import {
   type TextInputProps as RNTextInputProps,
 } from 'react-native';
 
+import { FeedbackFieldError } from '@/components/feedback/FeedbackFieldError';
 import { ThemedText } from '@/components/ui/ThemedText';
 import { fonts, radius, spacing } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/use-theme-colors';
@@ -42,11 +43,7 @@ export const TextInput = forwardRef<RNTextInput, TextInputProps>(function TextIn
         ]}
         {...props}
       />
-      {error ? (
-        <ThemedText variant="caption" style={{ color: colors.danger }}>
-          {error}
-        </ThemedText>
-      ) : null}
+      <FeedbackFieldError message={error} />
     </>
   );
 });

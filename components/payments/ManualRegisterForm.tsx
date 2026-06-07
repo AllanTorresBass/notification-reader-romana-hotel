@@ -5,6 +5,7 @@ import { PrimaryButton } from '@/components/shared/PrimaryButton';
 import { TextInput } from '@/components/ui/TextInput';
 import { ThemedText } from '@/components/ui/ThemedText';
 import { Card } from '@/components/ui/Card';
+import { copy } from '@/constants/copy';
 import { spacing } from '@/constants/theme';
 import { normalizePagoAmount } from '@/lib/utils/bdv-pagomovil-parser';
 
@@ -22,6 +23,7 @@ interface ManualRegisterFormProps {
   onChangePaymentDate: (v: string) => void;
   onChangePaymentTime: (v: string) => void;
   onSubmit: () => void;
+  onCancel?: () => void;
   isSubmitting: boolean;
 }
 
@@ -39,6 +41,7 @@ export function ManualRegisterForm({
   onChangePaymentDate,
   onChangePaymentTime,
   onSubmit,
+  onCancel,
   isSubmitting,
 }: ManualRegisterFormProps) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -68,7 +71,7 @@ export function ManualRegisterForm({
 
   return (
     <Card style={styles.form}>
-      <ThemedText variant="title">Registro manual</ThemedText>
+      <ThemedText variant="title">{copy.pagos.manualRegisterHeader}</ThemedText>
       <TextInput
         value={name}
         onChangeText={onChangeName}
@@ -124,6 +127,14 @@ export function ManualRegisterForm({
         onPress={handleSubmit}
         disabled={isSubmitting || !canSubmit}
       />
+      {onCancel ? (
+        <PrimaryButton
+          label={copy.pagos.cancelManual}
+          variant="secondary"
+          onPress={onCancel}
+          disabled={isSubmitting}
+        />
+      ) : null}
     </Card>
   );
 }

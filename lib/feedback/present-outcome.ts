@@ -1,5 +1,8 @@
 import * as Burnt from 'burnt';
+import * as Haptics from 'expo-haptics';
 
+import { toastDurationSeconds } from '@/lib/feedback/toast-duration';
+import { enqueueOutcomeToast, registerToastPresenter } from '@/lib/feedback/toast-queue';
 import type { OperationOutcome, OperationStatus } from '@/types/feedback/operation-outcome.types';
 
 function presetForStatus(status: OperationStatus): 'done' | 'error' | 'none' {
@@ -8,21 +11,31 @@ function presetForStatus(status: OperationStatus): 'done' | 'error' | 'none' {
   return 'none';
 }
 
-function hapticForStatus(status: OperationStatus): 'success' | 'error' | 'warning' | undefined {
+export function hapticForStatus(
+  status: OperationStatus
+): 'success' | 'error' | 'warning' | undefined {
   if (status === 'completed') return 'success';
   if (status === 'failed') return 'error';
   if (status === 'partial' || status === 'queued') return 'warning';
   return undefined;
 }
 
-function durationForOutcome(outcome: OperationOutcome): number {
-  if (outcome.kind === 'confirm_payment' || outcome.kind === 'assign_client') {
-    return outcome.status === 'failed' ? 5 : 4;
+export function presentOutcomeHaptic(outcome: OperationOutcome): void {
+  const haptic = hapticForStatus(outcome.status);
+  if (haptic === 'success') {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    return;
   }
-  return outcome.status === 'failed' ? 4 : 3;
+  if (haptic === 'error') {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    return;
+  }
+  if (haptic === 'warning') {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  }
 }
 
-export function presentOutcomeToast(outcome: OperationOutcome): void {
+export function presentBurntToastImmediate(outcome: OperationOutcome): void {
   const preset = presetForStatus(outcome.status);
   const haptic = hapticForStatus(outcome.status);
 
@@ -31,6 +44,12 @@ export function presentOutcomeToast(outcome: OperationOutcome): void {
     message: outcome.message,
     preset,
     haptic,
-    duration: durationForOutcome(outcome),
+    duration: toastDurationSeconds(outcome),
   });
+}
+
+registerToastPresenter(presentBurntToastImmediate);
+
+export function presentOutcomeToast(outcome: OperationOutcome): void {
+  enqueueOutcomeToast(outcome);
 }

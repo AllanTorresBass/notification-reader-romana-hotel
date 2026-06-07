@@ -5,6 +5,9 @@ import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { ActivityLogPanel } from '@/components/feedback/ActivityLogPanel';
+import { FeedbackInline } from '@/components/feedback/FeedbackInline';
+import { formatEntitySyncError } from '@/lib/feedback/format-operation-outcome';
+import { getUserErrorMessage } from '@/lib/utils/user-error-message';
 import { AppScreen } from '@/components/shared/AppScreen';
 import { PrimaryButton } from '@/components/shared/PrimaryButton';
 import { Badge } from '@/components/ui/Badge';
@@ -90,6 +93,7 @@ export default function SettingsScreen() {
   const { data: pendingJobs = 0 } = usePaymentSyncStatusQuery();
   const [apiUrl, setApiUrl] = useState(baseUrl || KD_GYM_DEFAULT_API_URL);
   const [staffEmail, setStaffEmail] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [staffPassword, setStaffPassword] = useState('');
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const [rescanning, setRescanning] = useState(false);
@@ -212,21 +216,30 @@ export default function SettingsScreen() {
                 label="Contraseña"
                 secureTextEntry
               />
+              {loginError ? <FeedbackInline message={loginError} tone="error" /> : null}
               <PrimaryButton
                 label={login.isPending ? copy.ajustes.loggingIn : copy.ajustes.login}
                 loading={login.isPending}
                 onPress={() => {
+                  setLoginError(null);
                   setBaseUrl(apiUrl.trim());
                   login.mutate(
                     { email: staffEmail.trim(), password: staffPassword },
                     {
                       onSuccess: () => {
+                        setLoginError(null);
                         reportLoginSuccess();
                         void queryClient.invalidateQueries({
                           queryKey: queryKeys.paymentRegisters.lists(),
                         });
                       },
-                      onError: (error) => reportLoginError(error),
+                      onError: (error) => {
+                        reportLoginError(error, { presentationContext: { anchor: 'form' } });
+                        setLoginError(
+                          getUserErrorMessage(error, 'action', copy.feedback.session.loginFallback)
+                            .message
+                        );
+                      },
                     }
                   );
                 }}
@@ -245,9 +258,7 @@ export default function SettingsScreen() {
             {lastSyncAt ? new Date(lastSyncAt).toLocaleString('es-VE') : '—'}
           </ThemedText>
           {lastSyncError ? (
-            <ThemedText variant="caption" style={{ color: colors.danger }}>
-              {lastSyncError}
-            </ThemedText>
+            <FeedbackInline outcome={formatEntitySyncError(lastSyncError)} compact />
           ) : null}
           <PrimaryButton
             label={testConnection.isPending ? copy.ajustes.testing : copy.ajustes.testConnection}

@@ -28,6 +28,28 @@ export interface PaymentRegisterCacheEntry {
   updatedAt: number;
 }
 
+export type PaymentStatusFilter =
+  | 'all'
+  | 'needs_action'
+  | 'pending_sync'
+  | 'sync_failed'
+  | 'awaiting_assign'
+  | 'completed';
+
+export interface PaymentRegisterListFilters {
+  status?: PaymentStatusFilter;
+  search?: string;
+}
+
+export interface PaymentRegisterFilterCounts {
+  all: number;
+  needs_action: number;
+  pending_sync: number;
+  sync_failed: number;
+  awaiting_assign: number;
+  completed: number;
+}
+
 export interface PaymentRegisterListPage {
   items: PaymentRegisterCacheEntry[];
   nextOffset: number | null;

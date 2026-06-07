@@ -1,27 +1,11 @@
-import { CheckCircle, Clock, Info, XCircle } from 'lucide-react-native';
 import { StyleSheet, View } from 'react-native';
 
+import { paletteForTone, toneForStatus } from '@/components/feedback/feedback-tokens';
+import { FeedbackStatusIcon } from '@/components/feedback/FeedbackStatusIcon';
 import { ThemedText } from '@/components/ui/ThemedText';
 import { radius, spacing } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/use-theme-colors';
-import type { OperationOutcome, OperationStatus } from '@/types/feedback/operation-outcome.types';
-
-type FeedbackTone = 'success' | 'warning' | 'error' | 'info';
-
-function toneForStatus(status: OperationStatus): FeedbackTone {
-  if (status === 'completed') return 'success';
-  if (status === 'failed') return 'error';
-  if (status === 'queued' || status === 'partial') return 'warning';
-  return 'info';
-}
-
-function StatusIcon({ tone, color }: { tone: FeedbackTone; color: string }) {
-  const size = 22;
-  if (tone === 'success') return <CheckCircle color={color} size={size} />;
-  if (tone === 'error') return <XCircle color={color} size={size} />;
-  if (tone === 'warning') return <Clock color={color} size={size} />;
-  return <Info color={color} size={size} />;
-}
+import type { OperationOutcome } from '@/types/feedback/operation-outcome.types';
 
 interface OperationFeedbackCardProps {
   outcome: OperationOutcome;
@@ -30,29 +14,7 @@ interface OperationFeedbackCardProps {
 export function OperationFeedbackCard({ outcome }: OperationFeedbackCardProps) {
   const { colors } = useThemeColors();
   const tone = toneForStatus(outcome.status);
-
-  const palette = {
-    success: {
-      backgroundColor: `${colors.success}18`,
-      borderColor: `${colors.success}44`,
-      accent: colors.success,
-    },
-    warning: {
-      backgroundColor: `${colors.warning}18`,
-      borderColor: `${colors.warning}44`,
-      accent: colors.warning,
-    },
-    error: {
-      backgroundColor: `${colors.danger}18`,
-      borderColor: `${colors.danger}44`,
-      accent: colors.danger,
-    },
-    info: {
-      backgroundColor: colors.accentSurface,
-      borderColor: colors.border,
-      accent: colors.textMuted,
-    },
-  }[tone];
+  const palette = paletteForTone(tone, colors);
 
   return (
     <View
@@ -62,8 +24,9 @@ export function OperationFeedbackCard({ outcome }: OperationFeedbackCardProps) {
       ]}
       accessibilityRole="text"
       accessibilityLabel={`${outcome.title}. ${outcome.message}`}
+      accessibilityLiveRegion="polite"
     >
-      <StatusIcon tone={tone} color={palette.accent} />
+      <FeedbackStatusIcon tone={tone} color={palette.accent} size={22} />
       <View style={styles.text}>
         <ThemedText variant="label" style={{ color: palette.accent }}>
           {outcome.title}

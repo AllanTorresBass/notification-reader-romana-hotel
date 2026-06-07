@@ -4,6 +4,8 @@ import {
   formatCaptureBatchOutcome,
   formatConfirmPaymentOutcome,
   formatCaptureNotificationOutcome,
+  formatCreateInvoiceOutcome,
+  formatEntitySyncError,
   formatManualRegisterOutcome,
   formatPullSyncOutcome,
   formatQueueRetryOutcome,
@@ -231,5 +233,23 @@ describe('formatQueueRetryOutcome', () => {
     const outcome = formatQueueRetryOutcome({ processed: 3, failed: 0, pendingJobs: 0 });
     expect(outcome.status).toBe('completed');
     expect(outcome.title).toBe(copy.feedback.queue.completedTitle);
+  });
+});
+
+describe('formatCreateInvoiceOutcome', () => {
+  it('returns success copy with invoice number', () => {
+    const outcome = formatCreateInvoiceOutcome({ id: 'inv-1', invoiceNumber: 'FAC-001' });
+    expect(outcome.status).toBe('completed');
+    expect(outcome.title).toBe(copy.facturas.successTitle);
+    expect(outcome.message).toContain('FAC-001');
+  });
+});
+
+describe('formatEntitySyncError', () => {
+  it('wraps entity sync message with standard title', () => {
+    const outcome = formatEntitySyncError('Sesión inválida.');
+    expect(outcome.status).toBe('failed');
+    expect(outcome.title).toBe(copy.feedback.entitySync.title);
+    expect(outcome.message).toBe('Sesión inválida.');
   });
 });

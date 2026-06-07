@@ -15,8 +15,7 @@ export function useClientSearchQuery(search: string, enabled: boolean) {
         return await clientApiService.search(search, 1, 20);
       } catch (error) {
         reportError('client_search', error, copy.clients.searchError, 'fetch', {
-          toast: false,
-          log: true,
+          presentationContext: { anchor: 'form' },
         });
         throw error;
       }

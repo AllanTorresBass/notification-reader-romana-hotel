@@ -10,8 +10,11 @@ import { secureStorageClient } from '@/lib/storage/secure-storage-client';
 import { logger } from '@/lib/logger';
 import { paymentRegisterStoreEnvelopeSchema } from '@/types/payment/payment-register-cache.schemas';
 import { mergeInvoiceStatus, mergeSyncStatus } from '@/lib/utils/merge-payment-register-state';
+import { filterPaymentRegisters, getPaymentFilterCounts } from '@/lib/utils/filter-payment-registers';
 import type {
   PaymentRegisterCacheEntry,
+  PaymentRegisterFilterCounts,
+  PaymentRegisterListFilters,
   PaymentRegisterListPage,
   SyncStatus,
 } from '@/types/payment/payment-register-cache.types';
@@ -179,13 +182,20 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
 
   async listSlice(
     offset: number,
-    limit: number = NOTIFICATION_PAGE_SIZE
+    limit: number = NOTIFICATION_PAGE_SIZE,
+    filters: PaymentRegisterListFilters = {}
   ): Promise<PaymentRegisterListPage> {
     const entries = await this.hydrate();
-    const sorted = [...entries].sort((a, b) => b.createdAt - a.createdAt);
+    const filtered = filterPaymentRegisters(entries, filters);
+    const sorted = [...filtered].sort((a, b) => b.createdAt - a.createdAt);
     const items = sorted.slice(offset, offset + limit);
     const nextOffset = offset + limit < sorted.length ? offset + limit : null;
     return { items, nextOffset, total: sorted.length };
+  }
+
+  async getFilterCounts(): Promise<PaymentRegisterFilterCounts> {
+    const entries = await this.hydrate();
+    return getPaymentFilterCounts(entries);
   }
 
   async mergeRemoteEntries(

@@ -1,6 +1,7 @@
 import type { NotificationRecord } from '@/types/notification/notification.types';
 import type { ParsedPagomovil } from '@/types/payment/parsed-payment.types';
 import type { PaymentRegisterCacheEntry } from '@/types/payment/payment-register-cache.types';
+import type { PaymentRegisterListFilters } from '@/types/payment/payment-register-cache.types';
 import type {
   IngestNotificationResult,
   PaymentActionResult,
@@ -401,8 +402,12 @@ export class PaymentRegisterService {
     }
   }
 
-  async list(offset: number, limit: number) {
-    return paymentRegisterCacheRepository.listSlice(offset, limit);
+  async list(offset: number, limit: number, filters?: PaymentRegisterListFilters) {
+    return paymentRegisterCacheRepository.listSlice(offset, limit, filters);
+  }
+
+  async getFilterCounts() {
+    return paymentRegisterCacheRepository.getFilterCounts();
   }
 
   async clearLocalCache(): Promise<void> {

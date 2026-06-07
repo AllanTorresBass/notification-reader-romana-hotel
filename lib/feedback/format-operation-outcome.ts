@@ -285,6 +285,14 @@ export function formatErrorOutcome(
   return outcome(kind, 'failed', title, message);
 }
 
+export function formatEntitySyncError(message: string): OperationOutcome {
+  return outcome('pull_sync', 'failed', fb.entitySync.title, message);
+}
+
+export function formatValidationOutcome(title: string, message: string): OperationOutcome {
+  return outcome('manual_register', 'failed', title, message);
+}
+
 export function formatLoginOutcome(success: boolean, error?: unknown): OperationOutcome {
   if (success) {
     return outcome('login', 'completed', fb.session.loginTitle, fb.session.loginMessage);
@@ -333,6 +341,19 @@ export function formatCreateClientOutcome(clientName: string): OperationOutcome 
     'completed',
     fb.client.createdTitle,
     fb.client.createdMessage(clientName)
+  );
+}
+
+export function formatCreateInvoiceOutcome(invoice: {
+  id: string;
+  invoiceNumber: string;
+}): OperationOutcome {
+  return outcome(
+    'create_invoice',
+    'completed',
+    copy.facturas.successTitle,
+    copy.facturas.successMessage(invoice.invoiceNumber),
+    { meta: { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber } }
   );
 }
 

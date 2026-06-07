@@ -18,7 +18,7 @@ export function useInstalledAppsQuery(search: string) {
           error,
           'No pudimos listar las apps instaladas.',
           'fetch',
-          { toast: false, log: true }
+          { presentationContext: { anchor: 'list' } }
         );
         throw error;
       }
