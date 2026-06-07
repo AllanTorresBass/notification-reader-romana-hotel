@@ -55,6 +55,12 @@ export function PaymentRegisterCard({ entry, onPress }: PaymentRegisterCardProps
           variant={getBadgeVariant(entry.syncStatus)}
         />
 
+        {entry.syncStatus === 'sync_failed' && entry.lastSyncError ? (
+          <ThemedText variant="caption" style={{ color: colors.danger }} numberOfLines={2}>
+            {entry.lastSyncError}
+          </ThemedText>
+        ) : null}
+
         <PaymentStatusStepper
           syncStatus={entry.syncStatus}
           invoiceStatus={entry.invoiceStatus}

@@ -1,9 +1,16 @@
 import { useMutation } from '@tanstack/react-query';
 
+import {
+  formatLoginOutcome,
+  formatLogoutOutcome,
+  formatTestConnectionOutcome,
+} from '@/lib/feedback/format-operation-outcome';
+import { reportError, reportOutcome } from '@/lib/feedback/report-feedback';
 import { selectAuthStatus, selectIsAuthenticated } from '@/lib/auth/auth-selectors';
 import { authApiService } from '@/lib/api-client/auth/AuthApiService';
 import { paymentSyncOrchestrator } from '@/lib/services/payments/PaymentSyncOrchestrator';
 import { useApiAuthStore } from '@/stores/api-auth-store';
+import type { ReportOutcomeOptions } from '@/lib/feedback/report-feedback';
 
 export function useApiLoginMutation() {
   const setAuth = useApiAuthStore((s) => s.setAuth);
@@ -19,9 +26,23 @@ export function useApiLoginMutation() {
   });
 }
 
+export function reportLoginSuccess(options?: ReportOutcomeOptions): void {
+  reportOutcome(formatLoginOutcome(true), options);
+}
+
+export function reportLoginError(
+  error: unknown,
+  options?: ReportOutcomeOptions
+): void {
+  reportError('login', error, 'Verifica URL, email staff y contraseña.', 'action', options);
+}
+
 export function useApiLogout() {
   const clearAuth = useApiAuthStore((s) => s.clearAuth);
-  return () => clearAuth();
+  return () => {
+    clearAuth();
+    reportOutcome(formatLogoutOutcome());
+  };
 }
 
 export function useIsApiAuthenticated() {
@@ -49,5 +70,8 @@ export function useTestConnectionMutation() {
       await authApiService.pingMe();
       return paymentSyncOrchestrator.runSync('manual');
     },
+    onSuccess: (result) => reportOutcome(formatTestConnectionOutcome(result)),
+    onError: (error) =>
+      reportError('test_connection', error, 'No se pudo conectar con kd-gym.', 'fetch'),
   });
 }

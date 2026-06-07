@@ -1,15 +1,19 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { KdGymLogo } from '@/components/brand/KdGymLogo';
 import { AppScreen } from '@/components/shared/AppScreen';
 import { KD_GYM_DEFAULT_API_URL } from '@/constants/api-defaults';
 import { PrimaryButton } from '@/components/shared/PrimaryButton';
 import { TextInput } from '@/components/ui/TextInput';
 import { ThemedText } from '@/components/ui/ThemedText';
 import { copy } from '@/constants/copy';
-import { useApiLoginMutation } from '@/hooks/use-api-auth';
+import { spacing } from '@/constants/theme';
+import { useApiLoginMutation, reportLoginError, reportLoginSuccess } from '@/hooks/use-api-auth';
 import { useThemeColors } from '@/hooks/use-theme-colors';
+import { formatOnboardingSkipOutcome } from '@/lib/feedback/format-operation-outcome';
+import { reportOutcome } from '@/lib/feedback/report-feedback';
 import { getUserErrorMessage } from '@/lib/utils/user-error-message';
 import { useApiConfigStore } from '@/stores/api-config-store';
 import { useWhitelistStore } from '@/stores/whitelist-store';
@@ -37,10 +41,17 @@ export default function OnboardingConnectScreen() {
     setBaseUrl(url.trim());
     try {
       await login.mutateAsync({ email: email.trim(), password });
+      reportLoginSuccess();
       finish();
     } catch (e) {
+      reportLoginError(e, { toast: false, log: true });
       setError(getUserErrorMessage(e, 'action', 'Error de conexión').message);
     }
+  };
+
+  const handleSkip = () => {
+    reportOutcome(formatOnboardingSkipOutcome());
+    finish();
   };
 
   return (
@@ -48,6 +59,9 @@ export default function OnboardingConnectScreen() {
       title="Conectar kd-gym"
       subtitle="Inicia sesión con tu cuenta staff de kd-gym para sincronizar pagos."
     >
+      <View style={styles.brand}>
+        <KdGymLogo size={64} />
+      </View>
       <ThemedText variant="caption" muted>
         {copy.onboarding.step(4, 4)}
       </ThemedText>
@@ -84,8 +98,16 @@ export default function OnboardingConnectScreen() {
         label="Conectar y continuar"
         onPress={() => void handleConnect()}
         disabled={login.isPending || !url.trim() || !email.trim() || !password}
+        loading={login.isPending}
       />
-      <PrimaryButton label="Omitir por ahora" variant="secondary" onPress={finish} />
+      <PrimaryButton label="Omitir por ahora" variant="secondary" onPress={handleSkip} />
     </AppScreen>
   );
 }
+
+const styles = StyleSheet.create({
+  brand: {
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+});

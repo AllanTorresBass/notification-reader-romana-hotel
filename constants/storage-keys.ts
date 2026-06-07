@@ -7,6 +7,8 @@ export const STORAGE_KEYS = {
   paymentRegisters: 'nr.payment-registers.v1',
   paymentSyncQueue: 'nr.payment-sync-queue.v1',
   apiConfig: 'nr.api-config.v1',
+  activityLog: 'nr.activity-log.v1',
+  activityLogSyncQueue: 'nr.activity-log-sync-queue.v1',
 } as const;
 
 export const STORAGE_VERSION = 1;

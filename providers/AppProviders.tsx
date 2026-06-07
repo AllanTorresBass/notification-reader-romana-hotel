@@ -5,7 +5,9 @@ import { StyleSheet } from 'react-native';
 
 import { useNotificationListener } from '@/hooks/use-notification-listener';
 import { usePaymentSyncHost } from '@/hooks/use-payment-sync-host';
+import { activityLogSyncService } from '@/lib/services/feedback/ActivityLogSyncService';
 import { notificationService } from '@/lib/services/notifications/NotificationService';
+import { useActivityLogStore } from '@/stores/activity-log-store';
 import { usePreferencesStore } from '@/stores/preferences-store';
 
 interface AppProvidersProps {
@@ -17,8 +19,10 @@ function NotificationListenerHost() {
   usePaymentSyncHost();
 
   useEffect(() => {
+    void useActivityLogStore.getState().hydrate();
     const retentionDays = usePreferencesStore.getState().retentionDays;
     void notificationService.purgeRetention(retentionDays);
+    void activityLogSyncService.flushPending();
   }, []);
 
   return null;

@@ -1,21 +1,22 @@
 import { useRouter } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 
+import { KdGymLogo } from '@/components/brand/KdGymLogo';
 import { AppScreen } from '@/components/shared/AppScreen';
 import { PrimaryButton } from '@/components/shared/PrimaryButton';
 import { Card, CardContent } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/ThemedText';
 import { copy } from '@/constants/copy';
-import { KD_GYM_LOGO } from '@/constants/kd-gym-brand';
+import { spacing } from '@/constants/theme';
 
 export default function OnboardingWelcomeScreen() {
   const router = useRouter();
 
   return (
-    <AppScreen
-      title={copy.onboarding.welcomeTitle}
-      subtitle={copy.onboarding.welcomeSubtitle}
-      logo={KD_GYM_LOGO}
-    >
+    <AppScreen title={copy.onboarding.welcomeTitle} subtitle={copy.onboarding.welcomeSubtitle}>
+      <View style={styles.brand}>
+        <KdGymLogo size={80} />
+      </View>
       <ThemedText variant="caption" muted>
         {copy.onboarding.step(1, 4)}
       </ThemedText>
@@ -34,3 +35,10 @@ export default function OnboardingWelcomeScreen() {
     </AppScreen>
   );
 }
+
+const styles = StyleSheet.create({
+  brand: {
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+});

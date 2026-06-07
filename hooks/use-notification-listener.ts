@@ -4,6 +4,9 @@ import { AppState, Platform } from 'react-native';
 import type { NotificationData } from 'expo-android-notification-listener-service';
 
 import { ALLOWED_PACKAGES } from '@/constants/whitelist-defaults';
+import { reportCaptureNotificationDebounced } from '@/lib/feedback/capture-feedback-debouncer';
+import { formatShadeSyncOutcome } from '@/lib/feedback/format-operation-outcome';
+import { reportOutcome } from '@/lib/feedback/report-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { logger } from '@/lib/logger';
 import { notificationListenerBridge } from '@/lib/services/native/NotificationListenerBridge';
@@ -22,8 +25,11 @@ async function ingestIfAllowed(
     return false;
   }
   const record = await notificationService.ingest(event, { retentionDays, captureRawPayload });
-  await paymentRegisterService.ingestFromNotification(record);
-  return true;
+  const result = await paymentRegisterService.ingestFromNotification(record);
+  if (result.entry) {
+    reportCaptureNotificationDebounced(result);
+  }
+  return Boolean(result.entry);
 }
 
 export function useNotificationListener() {
@@ -35,15 +41,18 @@ export function useNotificationListener() {
     if (Platform.OS !== 'android') {
       return;
     }
-    const { ingested } = await syncNotificationsFromShade({
+    const shade = await syncNotificationsFromShade({
       allowedPackages: [...ALLOWED_PACKAGES],
       retentionDays,
       captureRawPayload,
     });
-    if (ingested > 0) {
+    if (shade.ingested > 0) {
       await paymentRegisterService.reprocessStoredNotifications();
       await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.lists() });
       await queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.lists() });
+      reportOutcome(formatShadeSyncOutcome(shade), { toast: true, log: true });
+    } else if (shade.scanned > 0) {
+      reportOutcome(formatShadeSyncOutcome(shade), { toast: false, log: true });
     }
   }, [retentionDays, captureRawPayload, queryClient]);
 

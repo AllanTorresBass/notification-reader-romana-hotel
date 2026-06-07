@@ -1,8 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
 import BottomSheet from '@gorhom/bottom-sheet';
+import * as Haptics from 'expo-haptics';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -18,31 +19,46 @@ import { AppScreen } from '@/components/shared/AppScreen';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { PrimaryButton } from '@/components/shared/PrimaryButton';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';
-import { Banner } from '@/components/ui/Banner';
+import { BannerStack, type BannerItem } from '@/components/ui/Banner';
 import { copy } from '@/constants/copy';
 import { spacing } from '@/constants/theme';
-import { useGlobalErrorHandler } from '@/hooks/use-global-error-handler';
 import { useApiAuthStatus, useIsApiAuthenticated, useLastSyncError } from '@/hooks/use-api-auth';
 import {
   useAssignClientMutation,
   useConfirmPaymentMutation,
+  useManualRegisterMutation,
   usePaymentRegistersInfiniteQuery,
   usePendingLocalSyncCountQuery,
+  useQueueRetryMutation,
 } from '@/hooks/use-payment-registers';
 import { useNotificationShadeSync } from '@/hooks/use-notification-shade-sync';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { queryKeys } from '@/lib/query-keys';
 import { uxLogger } from '@/lib/logger';
-import { paymentRegisterService } from '@/lib/services/payments/PaymentRegisterService';
+import {
+  formatAssignClientOutcome,
+  formatConfirmPaymentOutcome,
+  formatErrorOutcome,
+  formatPullSyncOutcome,
+  formatShadeSyncOutcome,
+} from '@/lib/feedback/format-operation-outcome';
+import { reportOutcome, reportError } from '@/lib/feedback/report-feedback';
 import { paymentSyncOrchestrator } from '@/lib/services/payments/PaymentSyncOrchestrator';
 import { normalizePagoAmount } from '@/lib/utils/bdv-pagomovil-parser';
+import type { OperationOutcome } from '@/types/feedback/operation-outcome.types';
 import type { PaymentRegisterCacheEntry } from '@/types/payment/payment-register-cache.types';
+
+function outcomeBannerVariant(status: OperationOutcome['status']): BannerItem['variant'] {
+  if (status === 'completed') return 'success';
+  if (status === 'failed') return 'error';
+  if (status === 'queued' || status === 'partial') return 'warning';
+  return 'info';
+}
 
 export default function PagosScreen() {
   const router = useRouter();
   const { colors } = useThemeColors();
   const queryClient = useQueryClient();
-  const { handleCrudError, showSuccess } = useGlobalErrorHandler();
   const isAuthenticated = useIsApiAuthenticated();
   const authStatus = useApiAuthStatus();
   const lastSyncError = useLastSyncError();
@@ -54,7 +70,10 @@ export default function PagosScreen() {
   const [manualRef, setManualRef] = useState('');
   const [manualDate, setManualDate] = useState('');
   const [manualTime, setManualTime] = useState('');
-  const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [refreshBanner, setRefreshBanner] = useState<BannerItem | null>(null);
+  const [actionBanner, setActionBanner] = useState<BannerItem | null>(null);
+  const [detailFeedback, setDetailFeedback] = useState<OperationOutcome | null>(null);
+  const [assigningClientId, setAssigningClientId] = useState<string | null>(null);
 
   const detailRef = useRef<BottomSheet>(null);
   const assignRef = useRef<BottomSheet>(null);
@@ -63,6 +82,8 @@ export default function PagosScreen() {
     usePaymentRegistersInfiniteQuery();
   const confirmPayment = useConfirmPaymentMutation();
   const assignClient = useAssignClientMutation();
+  const manualRegister = useManualRegisterMutation();
+  const queueRetry = useQueueRetryMutation();
   const { data: pendingLocalSync = 0 } = usePendingLocalSyncCountQuery();
   const { syncFromShade } = useNotificationShadeSync();
 
@@ -71,57 +92,146 @@ export default function PagosScreen() {
     [data]
   );
 
-  const banner = useMemo(() => {
+  useEffect(() => {
+    if (!refreshBanner) return;
+    const timer = setTimeout(() => setRefreshBanner(null), 5000);
+    return () => clearTimeout(timer);
+  }, [refreshBanner]);
+
+  useEffect(() => {
+    if (!actionBanner) return;
+    const timer = setTimeout(() => setActionBanner(null), 6000);
+    return () => clearTimeout(timer);
+  }, [actionBanner]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const fresh = entries.find((entry) => entry.localId === selected.localId);
+    if (fresh && fresh.updatedAt !== selected.updatedAt) {
+      setSelected(fresh);
+    }
+  }, [entries, selected]);
+
+  const showActionBanner = useCallback((outcome: OperationOutcome) => {
+    setActionBanner({
+      id: `${outcome.kind}-${Date.now()}`,
+      title: outcome.title,
+      message: outcome.message,
+      variant: outcomeBannerVariant(outcome.status),
+      dismissible: true,
+      onDismiss: () => setActionBanner(null),
+    });
+  }, []);
+
+  const banners = useMemo(() => {
+    const items: BannerItem[] = [];
+
+    if (refreshBanner) {
+      items.push(refreshBanner);
+    }
+
+    if (actionBanner) {
+      items.push(actionBanner);
+    }
+
     if (authStatus === 'expired' || lastSyncError) {
-      return {
+      items.push({
+        id: 'auth-warning',
         message: lastSyncError ?? copy.pagos.sessionExpired,
-        variant: 'warning' as const,
+        variant: 'warning',
         actionLabel: copy.pagos.goToSettings,
         onAction: () => {
           uxLogger.event('auth_redirect', { source: 'pagos_banner' });
           router.push('/(tabs)/settings');
         },
-      };
-    }
-    if (!isAuthenticated) {
-      return {
+      });
+    } else if (!isAuthenticated) {
+      items.push({
+        id: 'connect-info',
         message: copy.pagos.connectPrompt,
-        variant: 'info' as const,
+        variant: 'info',
         actionLabel: copy.pagos.goToSettings,
         onAction: () => router.push('/(tabs)/settings'),
-      };
-    }
-    if (pendingLocalSync > 0) {
-      return {
+      });
+    } else if (pendingLocalSync > 0) {
+      items.push({
+        id: 'pending-sync',
         message: copy.pagos.pendingSync(pendingLocalSync),
-        variant: 'info' as const,
-      };
+        variant: 'info',
+        actionLabel: 'Reintentar',
+        onAction: () => queueRetry.mutate(),
+      });
     }
-    return null;
-  }, [authStatus, isAuthenticated, lastSyncError, pendingLocalSync, router]);
+
+    return items;
+  }, [
+    authStatus,
+    isAuthenticated,
+    lastSyncError,
+    pendingLocalSync,
+    refreshBanner,
+    actionBanner,
+    router,
+    queueRetry,
+  ]);
 
   const openDetail = useCallback((entry: PaymentRegisterCacheEntry) => {
+    setDetailFeedback(null);
     setSelected(entry);
     detailRef.current?.expand();
   }, []);
 
   const refresh = useCallback(async () => {
-    await syncFromShade();
-    await paymentSyncOrchestrator.runSync(isAuthenticated ? 'manual' : 'notification');
-    await refetch();
-    await queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.lists() });
+    try {
+      const shade = await syncFromShade();
+      const shadeOutcome = formatShadeSyncOutcome(shade);
+      reportOutcome(shadeOutcome, { toast: false, log: true });
+
+      const syncResult = await paymentSyncOrchestrator.runSync(
+        isAuthenticated ? 'manual' : 'notification'
+      );
+      const syncOutcome = formatPullSyncOutcome(syncResult);
+      reportOutcome(syncOutcome);
+
+      if (syncOutcome.status === 'completed' || syncOutcome.status === 'skipped') {
+        setRefreshBanner({
+          id: 'refresh-success',
+          message: syncOutcome.message,
+          variant: syncOutcome.status === 'completed' ? 'success' : 'info',
+          dismissible: true,
+          onDismiss: () => setRefreshBanner(null),
+        });
+      }
+
+      await refetch();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.lists() });
+    } catch (error) {
+      reportError('pull_sync', error, 'No se pudo actualizar la lista.');
+    }
   }, [isAuthenticated, queryClient, refetch, syncFromShade]);
 
   const handleConfirmPayment = useCallback(() => {
     if (!selected) return;
     confirmPayment.mutate(selected.localId, {
-      onSuccess: (updated) => {
-        if (updated) setSelected(updated);
-        showSuccess('Pago confirmado');
+      onSuccess: (result) => {
+        const outcome = formatConfirmPaymentOutcome(result);
+        setDetailFeedback(outcome);
+        reportOutcome(outcome, { toast: false, log: true });
+        if (result.entry) setSelected(result.entry);
+        if (result.status === 'completed') {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
       },
-      onError: (error) => handleCrudError(error, 'No se pudo confirmar el pago.'),
+      onError: (error) => {
+        const outcome = formatErrorOutcome(
+          'confirm_payment',
+          error,
+          'No se pudo confirmar el pago.'
+        );
+        setDetailFeedback(outcome);
+      },
     });
-  }, [selected, confirmPayment, handleCrudError, showSuccess]);
+  }, [selected, confirmPayment]);
 
   const handleAssignClient = useCallback(() => {
     detailRef.current?.close();
@@ -129,59 +239,57 @@ export default function PagosScreen() {
   }, []);
 
   const handleAssign = useCallback(
-    (clientId: string) => {
+    (clientId: string, clientName: string) => {
       if (!selected) return;
+      setAssigningClientId(clientId);
       assignClient.mutate(
-        { localId: selected.localId, clientId },
+        { localId: selected.localId, clientId, clientName },
         {
-          onSuccess: (updated) => {
+          onSuccess: (result) => {
+            const outcome = formatAssignClientOutcome(result, clientName);
+            reportOutcome(outcome, { toast: false, log: true });
+            showActionBanner(outcome);
             assignRef.current?.close();
-            if (updated) setSelected(updated);
-            showSuccess('Cliente asociado');
+            setAssigningClientId(null);
+            if (result.entry) setSelected(result.entry);
+            if (result.status === 'completed') {
+              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            }
           },
-          onError: (error) => handleCrudError(error, 'No se pudo asociar el cliente.'),
+          onError: () => setAssigningClientId(null),
         }
       );
     },
-    [selected, assignClient, handleCrudError, showSuccess]
+    [selected, assignClient, showActionBanner]
   );
 
-  const submitManual = useCallback(async () => {
-    setManualSubmitting(true);
+  const submitManual = useCallback(() => {
     try {
       const pago = normalizePagoAmount(manualPago);
-      await paymentRegisterService.createManual({
-        name: manualName.trim() || null,
-        pago,
-        mobile: manualMobile.trim(),
-        ref: manualRef.trim(),
-        paymentDate: manualDate.trim(),
-        paymentTime: manualTime.trim(),
-      });
-      setShowManual(false);
-      uxLogger.event('manual_register_opened', { success: true });
-      showSuccess('Pago registrado');
-      await refetch();
+      manualRegister.mutate(
+        {
+          name: manualName.trim() || null,
+          pago,
+          mobile: manualMobile.trim(),
+          ref: manualRef.trim(),
+          paymentDate: manualDate.trim(),
+          paymentTime: manualTime.trim(),
+        },
+        {
+          onSuccess: () => {
+            setShowManual(false);
+            void refetch();
+          },
+        }
+      );
     } catch (error) {
-      handleCrudError(error, 'No se pudo registrar el pago.');
-    } finally {
-      setManualSubmitting(false);
+      reportError('manual_register', error, 'Monto inválido. Ejemplo: 15000,00');
     }
-  }, [
-    manualName,
-    manualPago,
-    manualMobile,
-    manualRef,
-    manualDate,
-    manualTime,
-    refetch,
-    handleCrudError,
-    showSuccess,
-  ]);
+  }, [manualName, manualPago, manualMobile, manualRef, manualDate, manualTime, manualRegister, refetch]);
 
   if (isLoading) {
     return (
-      <AppScreen title={copy.pagos.title} subtitle={copy.pagos.loading} scroll={false}>
+      <AppScreen title={copy.pagos.title} subtitle={copy.pagos.loading} scroll={false} brandLogo>
         <View style={styles.skeletons}>
           <SkeletonCard />
           <SkeletonCard />
@@ -191,15 +299,8 @@ export default function PagosScreen() {
   }
 
   return (
-    <AppScreen title={copy.pagos.title} subtitle={copy.pagos.subtitle} scroll={false}>
-      {banner ? (
-        <Banner
-          message={banner.message}
-          variant={banner.variant}
-          actionLabel={banner.actionLabel}
-          onAction={banner.onAction}
-        />
-      ) : null}
+    <AppScreen title={copy.pagos.title} subtitle={copy.pagos.subtitle} scroll={false} brandLogo>
+      <BannerStack items={banners} />
 
       {showManual ? (
         <ManualRegisterForm
@@ -215,11 +316,8 @@ export default function PagosScreen() {
           onChangeRef={setManualRef}
           onChangePaymentDate={setManualDate}
           onChangePaymentTime={setManualTime}
-          onSubmit={() => {
-            uxLogger.event('manual_register_opened');
-            void submitManual();
-          }}
-          isSubmitting={manualSubmitting}
+          onSubmit={submitManual}
+          isSubmitting={manualRegister.isPending}
         />
       ) : null}
 
@@ -262,6 +360,7 @@ export default function PagosScreen() {
       <PaymentDetailSheet
         ref={detailRef}
         entry={selected}
+        actionFeedback={detailFeedback}
         onConfirmPayment={handleConfirmPayment}
         onAssignClient={handleAssignClient}
         isConfirming={confirmPayment.isPending}
@@ -271,6 +370,7 @@ export default function PagosScreen() {
         ref={assignRef}
         onAssign={handleAssign}
         isAssigning={assignClient.isPending}
+        assigningClientId={assigningClientId}
       />
     </AppScreen>
   );

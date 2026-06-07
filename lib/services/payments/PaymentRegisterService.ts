@@ -1,6 +1,11 @@
 import type { NotificationRecord } from '@/types/notification/notification.types';
 import type { ParsedPagomovil } from '@/types/payment/parsed-payment.types';
 import type { PaymentRegisterCacheEntry } from '@/types/payment/payment-register-cache.types';
+import type {
+  IngestNotificationResult,
+  PaymentActionResult,
+  QueueProcessResult,
+} from '@/types/payment/payment-action-result.types';
 import { paymentRegisterApiService } from '@/lib/api-client/payment-registers/PaymentRegisterApiService';
 import { ApiError } from '@/lib/api-client/base/BaseApiClient';
 import { authEvents } from '@/lib/auth/auth-events';
@@ -24,11 +29,11 @@ function canSyncToRemote(entry: Pick<PaymentRegisterCacheEntry, 'pago' | 'mobile
 }
 
 export class PaymentRegisterService {
-  async ingestFromNotification(record: NotificationRecord): Promise<PaymentRegisterCacheEntry | null> {
+  async ingestFromNotification(record: NotificationRecord): Promise<IngestNotificationResult> {
     const parseInput = notificationRecordToParseInput(record);
 
     if (!isPagomovilNotification(parseInput)) {
-      return null;
+      return { entry: null, created: false, duplicate: false, parseFailed: false, partialParse: false };
     }
 
     const parsed = parsePagomovilNotification(parseInput, record.postTime);
@@ -36,7 +41,7 @@ export class PaymentRegisterService {
     const notificationKey = buildDedupeKey(record.packageName, record.notificationKey);
     const existing = await paymentRegisterCacheRepository.getByNotificationKey(notificationKey);
     if (existing?.remoteRegisterId) {
-      return existing;
+      return { entry: existing, created: false, duplicate: true, parseFailed: false, partialParse: false };
     }
 
     if (parsed.confidence === 'failed') {
@@ -44,7 +49,7 @@ export class PaymentRegisterService {
         notificationId: record.id,
         title: record.title,
       });
-      return paymentRegisterCacheRepository.upsert({
+      const entry = await paymentRegisterCacheRepository.upsert({
         name: null,
         pago: '0.00',
         mobile: 'sin-leer',
@@ -56,6 +61,7 @@ export class PaymentRegisterService {
         syncStatus: 'sync_failed',
         lastSyncError: 'No se pudo leer el texto. Complete manualmente.',
       });
+      return { entry, created: true, duplicate: false, parseFailed: true, partialParse: false };
     }
 
     const pago = parsed.pago || '0.00';
@@ -79,7 +85,13 @@ export class PaymentRegisterService {
 
     await this.enqueueCreateRegisterIfNeeded(entry);
 
-    return entry;
+    return {
+      entry,
+      created: true,
+      duplicate: false,
+      parseFailed: false,
+      partialParse: parsed.confidence === 'partial',
+    };
   }
 
   /** Re-process stored BDV notifications (e.g. after app update or missed parse). */
@@ -94,8 +106,8 @@ export class PaymentRegisterService {
         continue;
       }
 
-      const entry = await this.ingestFromNotification(record);
-      if (entry) created += 1;
+      const result = await this.ingestFromNotification(record);
+      if (result.entry) created += 1;
     }
 
     if (created > 0) {
@@ -142,7 +154,7 @@ export class PaymentRegisterService {
     ref: string;
     paymentDate: string;
     paymentTime: string;
-  }): Promise<PaymentRegisterCacheEntry> {
+  }): Promise<PaymentActionResult> {
     const notificationKey = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const entry = await paymentRegisterCacheRepository.upsert({
       name: input.name,
@@ -159,15 +171,15 @@ export class PaymentRegisterService {
     if (useApiAuthStore.getState().isAuthenticated()) {
       void this.processQueue();
     }
-    return entry;
+    return { entry, status: 'queued' };
   }
 
-  async confirmPayment(localId: string): Promise<PaymentRegisterCacheEntry | null> {
+  async confirmPayment(localId: string): Promise<PaymentActionResult> {
     const entry = await paymentRegisterCacheRepository.getByLocalId(localId);
-    if (!entry) return null;
+    if (!entry) return { entry: null, status: 'queued' };
 
     if (entry.syncStatus === 'payment_confirmed' || entry.syncStatus === 'client_assigned') {
-      return entry;
+      return { entry, status: 'already_done' };
     }
 
     if (entry.remoteRegisterId && useApiAuthStore.getState().isAuthenticated()) {
@@ -177,11 +189,12 @@ export class PaymentRegisterService {
           paymentDate: entry.paymentDate,
           paymentTime: entry.paymentTime,
         });
-        return paymentRegisterCacheRepository.updateByLocalId(localId, {
+        const updated = await paymentRegisterCacheRepository.updateByLocalId(localId, {
           invoiceStatus: remote.invoiceStatus,
           syncStatus: 'payment_confirmed',
           lastSyncError: null,
         });
+        return { entry: updated, status: 'completed' };
       } catch (error) {
         const message = getUserErrorMessage(error, 'action', 'No se pudo confirmar el pago.').message;
         await paymentRegisterCacheRepository.updateByLocalId(localId, {
@@ -197,25 +210,32 @@ export class PaymentRegisterService {
     if (useApiAuthStore.getState().isAuthenticated()) {
       void this.processQueue();
     }
-    return entry;
+    return { entry, status: 'queued' };
   }
 
-  async assignClient(localId: string, clientId: string): Promise<PaymentRegisterCacheEntry | null> {
+  async assignClient(localId: string, clientId: string): Promise<PaymentActionResult> {
     const entry = await paymentRegisterCacheRepository.getByLocalId(localId);
-    if (!entry?.remoteRegisterId) {
+    if (!entry) return { entry: null, status: 'queued' };
+
+    if (entry.syncStatus === 'client_assigned') {
+      return { entry, status: 'already_done' };
+    }
+
+    if (!entry.remoteRegisterId) {
       await paymentSyncQueue.enqueue('assign_client', localId, { clientId });
       if (useApiAuthStore.getState().isAuthenticated()) {
         void this.processQueue();
       }
-      return entry;
+      return { entry, status: 'queued' };
     }
 
     try {
       await paymentRegisterApiService.assignClient(entry.remoteRegisterId, clientId);
-      return paymentRegisterCacheRepository.updateByLocalId(localId, {
+      const updated = await paymentRegisterCacheRepository.updateByLocalId(localId, {
         syncStatus: 'client_assigned',
         lastSyncError: null,
       });
+      return { entry: updated, status: 'completed' };
     } catch (error) {
       const message = getUserErrorMessage(error, 'action', 'No se pudo asociar el cliente.').message;
       await paymentRegisterCacheRepository.updateByLocalId(localId, {
@@ -245,15 +265,22 @@ export class PaymentRegisterService {
     useApiConfigStore.getState().setLastSyncAt(Date.now());
   }
 
-  async processQueue(): Promise<void> {
-    if (!useApiAuthStore.getState().isAuthenticated()) return;
+  async processQueue(): Promise<QueueProcessResult> {
+    if (!useApiAuthStore.getState().isAuthenticated()) {
+      return { processed: 0, failed: 0, pendingJobs: await paymentSyncQueue.getPendingCount() };
+    }
 
     const jobs = await paymentSyncQueue.getDueJobs();
+    let processed = 0;
+    let failed = 0;
+
     for (const job of jobs) {
       try {
         await this.processJob(job.type, job.localId, job.payload);
         await paymentSyncQueue.removeJob(job.id);
+        processed += 1;
       } catch (error) {
+        failed += 1;
         const apiError = error instanceof ApiError ? error : null;
         const message = getUserErrorMessage(error, 'action', 'No se pudo sincronizar con kd-gym.').message;
 
@@ -287,6 +314,12 @@ export class PaymentRegisterService {
         });
       }
     }
+
+    return {
+      processed,
+      failed,
+      pendingJobs: await paymentSyncQueue.getPendingCount(),
+    };
   }
 
   private async processJob(

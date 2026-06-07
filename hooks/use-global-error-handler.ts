@@ -13,6 +13,32 @@ export function useGlobalErrorHandler() {
     });
   };
 
+  const showPending = (title: string, message?: string) => {
+    void Burnt.toast({
+      title,
+      message,
+      preset: 'none',
+      haptic: 'warning',
+    });
+  };
+
+  const showInfo = (title: string, message?: string) => {
+    void Burnt.toast({
+      title,
+      message,
+      preset: 'none',
+    });
+  };
+
+  const showWarning = (title: string, message?: string) => {
+    void Burnt.toast({
+      title,
+      message,
+      preset: 'none',
+      haptic: 'warning',
+    });
+  };
+
   const handleFetchError = (error: unknown, fallbackMessage?: string) => {
     const { title, message } = getUserErrorMessage(error, 'fetch', fallbackMessage);
     logger.error('Fetch error', {
@@ -41,5 +67,12 @@ export function useGlobalErrorHandler() {
     });
   };
 
-  return { showSuccess, handleFetchError, handleCrudError };
+  return {
+    showSuccess,
+    showPending,
+    showInfo,
+    showWarning,
+    handleFetchError,
+    handleCrudError,
+  };
 }

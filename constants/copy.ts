@@ -16,6 +16,44 @@ export const copy = {
     pendingSync: (count: number) =>
       `${count} pago(s) pendiente(s) de sincronizar con kd-gym.`,
     goToSettings: 'Ir a Ajustes',
+    actions: {
+      confirm: {
+        completedTitle: 'Pago confirmado',
+        completedMessage: (summary: string) =>
+          `${summary} — factura marcada como pagada en kd-gym.`,
+        completedMessageGeneric: 'La factura fue marcada como pagada en kd-gym.',
+        queuedTitle: 'Confirmación guardada',
+        queuedMessage: (summary: string) =>
+          `${summary} — se aplicará en kd-gym cuando haya conexión.`,
+        queuedMessageGeneric:
+          'La confirmación se aplicará en kd-gym en cuanto haya conexión.',
+        alreadyTitle: 'Ya estaba confirmado',
+        alreadyMessage: (summary: string) => `${summary} — este pago ya fue confirmado antes.`,
+        alreadyMessageGeneric: 'Este pago ya fue confirmado anteriormente.',
+        nextStep: 'Siguiente paso: asocia el cliente de kd-gym a este pago.',
+        confirming: 'Confirmando pago…',
+      },
+      assign: {
+        completedTitle: 'Cliente asociado',
+        completedMessage: (client: string, summary: string) =>
+          summary
+            ? `${client} vinculado al pago de ${summary}.`
+            : `${client} vinculado correctamente en kd-gym.`,
+        queuedTitle: 'Asociación guardada',
+        queuedMessage: (client: string, summary: string) =>
+          summary
+            ? `${client} se vinculará al pago de ${summary} al sincronizar.`
+            : `${client} se vinculará en kd-gym al sincronizar el pago.`,
+        alreadyTitle: 'Ya tenía cliente',
+        alreadyMessage: (client: string, summary: string) =>
+          summary
+            ? `Este pago de ${summary} ya tenía un cliente asociado.`
+            : 'Este pago ya tenía un cliente asociado.',
+        clientFallback: 'El cliente',
+        assigning: 'Asociando cliente…',
+        assignCta: 'Asociar cliente',
+      },
+    },
   },
   ajustes: {
     title: 'Ajustes',
@@ -78,5 +116,22 @@ export const copy = {
     noResultsHint: 'Prueba otro nombre o crea un cliente nuevo.',
     searchError: 'No se pudo buscar clientes. Intenta de nuevo.',
     retry: 'Reintentar',
+  },
+  feedback: {
+    confirmQueued: 'El pago se confirmará cuando haya conexión con kd-gym.',
+    confirmCompleted: 'Factura actualizada en kd-gym.',
+    assignQueued: 'El cliente se asociará cuando el pago esté sincronizado con kd-gym.',
+    assignCompleted: 'Cliente vinculado en kd-gym.',
+    syncComplete: 'Sincronización completa',
+    syncFailed: 'No se pudo sincronizar',
+    syncInFlight: 'Sincronización en curso',
+    captureDetected: 'Nuevo pago detectado',
+    captureDuplicate: 'Pago ya registrado',
+    queueRetryDone: 'Reintento completado',
+    sessionClosed: 'Sesión cerrada',
+    connected: 'Conectado',
+    skipConnect: 'Podrás conectar kd-gym después en Ajustes.',
+    noActivity: 'Sin actividad reciente',
+    clearActivity: 'Limpiar actividad',
   },
 } as const;
