@@ -11,15 +11,17 @@ import { radius, spacing } from '@/constants/theme';
 import { useClientSearchQuery } from '@/hooks/use-clients-search';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { clientApiService } from '@/lib/api-client/clients/ClientApiService';
+import { reportError } from '@/lib/feedback/report-feedback';
 import { getUserErrorMessage } from '@/lib/utils/user-error-message';
 
 interface AssignClientSheetProps {
-  onAssign: (clientId: string) => void;
+  onAssign: (clientId: string, clientName: string) => void;
   isAssigning: boolean;
+  assigningClientId?: string | null;
 }
 
 export const AssignClientSheet = forwardRef<BottomSheet, AssignClientSheetProps>(
-  function AssignClientSheet({ onAssign, isAssigning }, ref) {
+  function AssignClientSheet({ onAssign, isAssigning, assigningClientId }, ref) {
     const { colors } = useThemeColors();
     const snapPoints = useMemo(() => ['70%'], []);
     const [search, setSearch] = useState('');
@@ -42,8 +44,12 @@ export const AssignClientSheet = forwardRef<BottomSheet, AssignClientSheetProps>
           identityCard: identityCard.trim(),
           phone: phone.trim() || null,
         });
-        onAssign(client.id);
+        onAssign(client.id, client.fullName);
       } catch (e) {
+        reportError('create_client', e, 'No se pudo crear el cliente.', 'action', {
+          toast: false,
+          log: true,
+        });
         setCreateError(getUserErrorMessage(e, 'action', 'No se pudo crear el cliente.').message);
       } finally {
         setCreating(false);
@@ -91,22 +97,36 @@ export const AssignClientSheet = forwardRef<BottomSheet, AssignClientSheetProps>
                   description={copy.clients.noResultsHint}
                 />
               ) : null}
-              {data?.data.map((client) => (
-                <Pressable
-                  key={client.id}
-                  onPress={() => onAssign(client.id)}
-                  disabled={isAssigning}
-                  style={[styles.clientRow, { borderColor: colors.border }]}
-                >
-                  <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                    {client.fullName}
-                  </ThemedText>
-                  <ThemedText variant="caption" muted>
-                    {client.identityCard}
-                    {client.phone ? ` · ${client.phone}` : ''}
-                  </ThemedText>
-                </Pressable>
-              ))}
+              {data?.data.map((client) => {
+                const isSelected = isAssigning && assigningClientId === client.id;
+                return (
+                  <Pressable
+                    key={client.id}
+                    onPress={() => onAssign(client.id, client.fullName)}
+                    disabled={isAssigning}
+                    style={[
+                      styles.clientRow,
+                      {
+                        borderColor: isSelected ? colors.primary : colors.border,
+                        opacity: isAssigning && !isSelected ? 0.6 : 1,
+                      },
+                    ]}
+                  >
+                    <View style={styles.clientRowHeader}>
+                      <ThemedText variant="body" style={{ fontWeight: '600' }}>
+                        {client.fullName}
+                      </ThemedText>
+                      {isSelected ? (
+                        <ActivityIndicator color={colors.primary} size="small" />
+                      ) : null}
+                    </View>
+                    <ThemedText variant="caption" muted>
+                      {client.identityCard}
+                      {client.phone ? ` · ${client.phone}` : ''}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
               <PrimaryButton
                 label="Crear cliente"
                 variant="secondary"
@@ -165,6 +185,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.md,
     gap: spacing.xs,
+  },
+  clientRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
   errorBlock: { gap: spacing.sm },
 });

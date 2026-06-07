@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { Pressable, StyleSheet, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, type ViewStyle } from 'react-native';
 
 import { ThemedText } from '@/components/ui/ThemedText';
 import { radius, spacing } from '@/constants/theme';
@@ -7,11 +7,12 @@ import { useThemeColors } from '@/hooks/use-theme-colors';
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost';
 
-interface ButtonProps {
+export interface ButtonProps {
   label: string;
   onPress: () => void;
   variant?: ButtonVariant;
   disabled?: boolean;
+  loading?: boolean;
   style?: ViewStyle;
   accessibilityLabel?: string;
 }
@@ -21,10 +22,12 @@ export function Button({
   onPress,
   variant = 'primary',
   disabled = false,
+  loading = false,
   style,
   accessibilityLabel,
 }: ButtonProps) {
   const { colors } = useThemeColors();
+  const isDisabled = disabled || loading;
 
   const backgroundColor =
     variant === 'primary'
@@ -53,8 +56,9 @@ export function Button({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
-      disabled={disabled}
+      disabled={isDisabled}
       onPress={() => {
+        if (loading) return;
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
       }}
@@ -64,14 +68,18 @@ export function Button({
           backgroundColor,
           borderColor,
           borderWidth: variant === 'outline' ? 1 : 0,
-          opacity: disabled ? 0.5 : pressed ? 0.88 : 1,
+          opacity: isDisabled ? 0.5 : pressed ? 0.88 : 1,
         },
         style,
       ]}
     >
-      <ThemedText variant="button" style={{ color: textColor }}>
-        {label}
-      </ThemedText>
+      {loading ? (
+        <ActivityIndicator color={textColor} />
+      ) : (
+        <ThemedText variant="button" style={{ color: textColor }}>
+          {label}
+        </ThemedText>
+      )}
     </Pressable>
   );
 }

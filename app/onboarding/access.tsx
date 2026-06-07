@@ -10,11 +10,19 @@ import { copy } from '@/constants/copy';
 import { spacing } from '@/constants/theme';
 import { useNotificationAccessQuery } from '@/hooks/use-notification-access';
 import { useThemeColors } from '@/hooks/use-theme-colors';
+import { formatAccessCheckOutcome } from '@/lib/feedback/format-operation-outcome';
+import { reportOutcome } from '@/lib/feedback/report-feedback';
 
 export default function OnboardingAccessScreen() {
   const router = useRouter();
   const { colors } = useThemeColors();
   const { hasAccess, openSettings, refetch } = useNotificationAccessQuery();
+
+  const checkAccess = async () => {
+    const result = await refetch();
+    const granted = result.data ?? hasAccess;
+    reportOutcome(formatAccessCheckOutcome(granted), { toast: true, log: false });
+  };
 
   return (
     <AppScreen
@@ -37,9 +45,7 @@ export default function OnboardingAccessScreen() {
       <PrimaryButton
         label="Ya activé el acceso"
         variant="secondary"
-        onPress={async () => {
-          await refetch();
-        }}
+        onPress={() => void checkAccess()}
       />
       <PrimaryButton
         label="Continuar"

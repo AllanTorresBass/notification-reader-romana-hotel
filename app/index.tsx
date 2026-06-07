@@ -1,13 +1,25 @@
-import { Redirect } from 'expo-router';
+import { Redirect, useRootNavigationState } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { KdGymLogo } from '@/components/brand/KdGymLogo';
 import { ThemedText } from '@/components/ui/ThemedText';
+import { spacing } from '@/constants/theme';
 import { useAppGates } from '@/hooks/use-app-gates';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
 export default function IndexScreen() {
+  const navigationState = useRootNavigationState();
   const { colors } = useThemeColors();
   const { isAndroid, accessLoading, needsOnboarding, isReady } = useAppGates();
+
+  if (!navigationState?.key) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <KdGymLogo size={72} />
+        <ActivityIndicator color={colors.primary} size="large" />
+      </View>
+    );
+  }
 
   if (!isAndroid) {
     return (
@@ -23,6 +35,7 @@ export default function IndexScreen() {
   if (accessLoading) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <KdGymLogo size={72} />
         <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
@@ -45,7 +58,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    gap: 12,
+    gap: spacing.md,
   },
   subtitle: { textAlign: 'center' },
 });

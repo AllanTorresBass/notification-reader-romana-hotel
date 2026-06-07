@@ -2,12 +2,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 
+import { ActivityLogPanel } from '@/components/feedback/ActivityLogPanel';
 import { AppScreen } from '@/components/shared/AppScreen';
 import { PrimaryButton } from '@/components/shared/PrimaryButton';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { SettingRow } from '@/components/ui/SettingRow';
 import { TextInput } from '@/components/ui/TextInput';
 import { ThemedText } from '@/components/ui/ThemedText';
@@ -22,20 +24,31 @@ import {
   useIsApiAuthenticated,
   useLastSyncError,
   useTestConnectionMutation,
+  reportLoginError,
+  reportLoginSuccess,
 } from '@/hooks/use-api-auth';
 import {
   useClearHistoryMutation,
   usePurgeRetentionMutation,
 } from '@/hooks/use-notifications';
-import { usePaymentSyncStatusQuery, usePullPaymentRegistersMutation } from '@/hooks/use-payment-registers';
+import {
+  usePaymentSyncStatusQuery,
+  usePullPaymentRegistersMutation,
+  useQueueRetryMutation,
+} from '@/hooks/use-payment-registers';
 import { useNotificationAccessQuery } from '@/hooks/use-notification-access';
 import { useNotificationShadeSync } from '@/hooks/use-notification-shade-sync';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { queryKeys } from '@/lib/query-keys';
 import { uxLogger } from '@/lib/logger';
+import {
+  formatClearCacheOutcome,
+  formatRescanBdvOutcome,
+  formatShadeSyncOutcome,
+} from '@/lib/feedback/format-operation-outcome';
+import { reportError, reportOutcome } from '@/lib/feedback/report-feedback';
 import { paymentRegisterService } from '@/lib/services/payments/PaymentRegisterService';
 import { paymentSyncOrchestrator } from '@/lib/services/payments/PaymentSyncOrchestrator';
-import { getUserErrorMessage } from '@/lib/utils/user-error-message';
 import { useApiConfigStore } from '@/stores/api-config-store';
 import { usePreferencesStore } from '@/stores/preferences-store';
 import { BANCO_DE_VENEZUELA_PACKAGE } from '@/constants/whitelist-defaults';
@@ -45,6 +58,8 @@ const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'light', label: copy.ajustes.themeLight },
   { value: 'system', label: copy.ajustes.themeSystem },
 ];
+
+type ConfirmAction = 'history' | 'cache' | null;
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -71,20 +86,96 @@ export default function SettingsScreen() {
   const login = useApiLoginMutation();
   const testConnection = useTestConnectionMutation();
   const pullRegisters = usePullPaymentRegistersMutation();
+  const queueRetry = useQueueRetryMutation();
   const { data: pendingJobs = 0 } = usePaymentSyncStatusQuery();
   const [apiUrl, setApiUrl] = useState(baseUrl || KD_GYM_DEFAULT_API_URL);
   const [staffEmail, setStaffEmail] = useState('');
   const [staffPassword, setStaffPassword] = useState('');
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [rescanning, setRescanning] = useState(false);
+  const [shadeSyncing, setShadeSyncing] = useState(false);
 
-  const confirmClear = () => {
-    Alert.alert(copy.ajustes.clearHistoryTitle, copy.ajustes.clearHistoryBody, [
-      { text: copy.ajustes.cancel, style: 'cancel' },
-      { text: copy.ajustes.clear, style: 'destructive', onPress: () => clearHistory.mutate() },
-    ]);
+  const handleRescanBdv = async () => {
+    if (!hasAccess) {
+      reportError(
+        'rescan_bdv',
+        new Error('Acceso requerido'),
+        'Activa el acceso a notificaciones para esta app en Ajustes de Android.'
+      );
+      return;
+    }
+
+    setRescanning(true);
+    try {
+      const shade = await syncFromShade();
+      const syncResult = await paymentSyncOrchestrator.runSync('notification');
+      await queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.lists() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.lists() });
+      reportOutcome(
+        formatRescanBdvOutcome({ shade, syncCreated: syncResult.created })
+      );
+    } catch (error) {
+      reportError('rescan_bdv', error, 'No se pudo re-escanear notificaciones BDV.');
+    } finally {
+      setRescanning(false);
+    }
+  };
+
+  const handleShadeSync = async () => {
+    setShadeSyncing(true);
+    try {
+      const shade = await syncFromShade();
+      const syncResult = await paymentSyncOrchestrator.runSync('notification');
+      await queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.lists() });
+      reportOutcome(
+        formatShadeSyncOutcome(shade, {
+          includeSync: syncResult.created > 0,
+        })
+      );
+    } catch (error) {
+      reportError('shade_sync', error, 'No se pudo sincronizar desde la barra.');
+    } finally {
+      setShadeSyncing(false);
+    }
   };
 
   return (
-    <AppScreen title={copy.ajustes.title} subtitle={copy.ajustes.subtitle}>
+    <AppScreen title={copy.ajustes.title} subtitle={copy.ajustes.subtitle} brandLogo>
+      <ConfirmDialog
+        visible={confirmAction === 'history'}
+        title={copy.ajustes.clearHistoryTitle}
+        message={copy.ajustes.clearHistoryBody}
+        confirmLabel={copy.ajustes.clear}
+        cancelLabel={copy.ajustes.cancel}
+        destructive
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          setConfirmAction(null);
+          clearHistory.mutate();
+        }}
+      />
+      <ConfirmDialog
+        visible={confirmAction === 'cache'}
+        title={copy.ajustes.clearCacheTitle}
+        message={copy.ajustes.clearCacheBody}
+        confirmLabel={copy.ajustes.clear}
+        cancelLabel={copy.ajustes.cancel}
+        destructive
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          setConfirmAction(null);
+          void paymentRegisterService
+            .clearLocalCache()
+            .then(() => {
+              reportOutcome(formatClearCacheOutcome());
+              void queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.lists() });
+            })
+            .catch((error) =>
+              reportError('clear_cache', error, 'No se pudo limpiar la caché local.')
+            );
+        }}
+      />
+
       <Card>
         <CardHeader title={copy.ajustes.connectionTitle} />
         <CardContent>
@@ -123,25 +214,19 @@ export default function SettingsScreen() {
               />
               <PrimaryButton
                 label={login.isPending ? copy.ajustes.loggingIn : copy.ajustes.login}
+                loading={login.isPending}
                 onPress={() => {
                   setBaseUrl(apiUrl.trim());
                   login.mutate(
                     { email: staffEmail.trim(), password: staffPassword },
                     {
                       onSuccess: () => {
+                        reportLoginSuccess();
                         void queryClient.invalidateQueries({
                           queryKey: queryKeys.paymentRegisters.lists(),
                         });
-                        Alert.alert('Conectado', 'Pagos sincronizando con kd-gym.');
                       },
-                      onError: (error) => {
-                        const { message } = getUserErrorMessage(
-                          error,
-                          'action',
-                          'Verifica URL, email staff y contraseña.'
-                        );
-                        Alert.alert('No se pudo iniciar sesión', message);
-                      },
+                      onError: (error) => reportLoginError(error),
                     }
                   );
                 }}
@@ -167,27 +252,14 @@ export default function SettingsScreen() {
           <PrimaryButton
             label={testConnection.isPending ? copy.ajustes.testing : copy.ajustes.testConnection}
             variant="secondary"
+            loading={testConnection.isPending}
             onPress={() => {
               setBaseUrl(apiUrl.trim());
               testConnection.mutate(undefined, {
-                onSuccess: (result) => {
-                  Alert.alert(
-                    'Conexión OK',
-                    result.authenticated
-                      ? `Sincronización completada. Cola: ${result.pendingJobs} · ${result.durationMs}ms`
-                      : 'Inicia sesión staff para sincronizar pagos.'
-                  );
+                onSuccess: () => {
                   void queryClient.invalidateQueries({
                     queryKey: queryKeys.paymentRegisters.lists(),
                   });
-                },
-                onError: (error) => {
-                  const { message } = getUserErrorMessage(
-                    error,
-                    'fetch',
-                    'No se pudo conectar con kd-gym.'
-                  );
-                  Alert.alert('Conexión fallida', message);
                 },
               });
             }}
@@ -195,17 +267,19 @@ export default function SettingsScreen() {
           <PrimaryButton
             label={copy.ajustes.syncPayments}
             variant="secondary"
+            loading={pullRegisters.isPending}
             onPress={() => {
               setBaseUrl(apiUrl.trim());
-              void pullRegisters.mutateAsync();
+              pullRegisters.mutate();
             }}
           />
           <PrimaryButton
             label={copy.ajustes.retryFailed}
             variant="secondary"
+            loading={queueRetry.isPending}
             onPress={() => {
               uxLogger.event('sync_retry', { source: 'ajustes' });
-              void paymentRegisterService.processQueue();
+              queueRetry.mutate();
             }}
           />
         </CardContent>
@@ -281,26 +355,18 @@ export default function SettingsScreen() {
           <PrimaryButton
             label={copy.ajustes.applyRetention}
             variant="secondary"
+            loading={purgeRetention.isPending}
             onPress={() => purgeRetention.mutate()}
           />
           <PrimaryButton
             label={copy.ajustes.clearAllHistory}
             variant="danger"
-            onPress={confirmClear}
+            onPress={() => setConfirmAction('history')}
           />
           <PrimaryButton
             label={copy.ajustes.clearLocalCache}
             variant="secondary"
-            onPress={() => {
-              Alert.alert(copy.ajustes.clearCacheTitle, copy.ajustes.clearCacheBody, [
-                { text: copy.ajustes.cancel, style: 'cancel' },
-                {
-                  text: copy.ajustes.clear,
-                  style: 'destructive',
-                  onPress: () => void paymentRegisterService.clearLocalCache(),
-                },
-              ]);
-            }}
+            onPress={() => setConfirmAction('cache')}
           />
         </CardContent>
       </Card>
@@ -326,55 +392,17 @@ export default function SettingsScreen() {
           </ThemedText>
           <PrimaryButton label={copy.ajustes.openNotificationSettings} onPress={openSettings} />
           <PrimaryButton
-            label={copy.ajustes.rescanBdv}
+            label={rescanning ? 'Escaneando…' : copy.ajustes.rescanBdv}
             variant="secondary"
-            onPress={async () => {
-              if (!hasAccess) {
-                Alert.alert(
-                  'Acceso requerido',
-                  'Activa el acceso a notificaciones para esta app en Ajustes de Android.',
-                  [
-                    { text: copy.ajustes.cancel, style: 'cancel' },
-                    { text: 'Abrir ajustes', onPress: openSettings },
-                  ]
-                );
-                return;
-              }
-
-              const shade = await syncFromShade();
-              const result = await paymentSyncOrchestrator.runSync('notification');
-              await queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.lists() });
-              await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.lists() });
-
-              if (!shade.listenerConnected) {
-                Alert.alert(
-                  'Servicio no conectado',
-                  'El lector de notificaciones no está activo. Cierra y abre la app, o reinicia el teléfono.'
-                );
-                return;
-              }
-
-              if (shade.scanned === 0) {
-                Alert.alert(
-                  'Sin notificaciones BDV',
-                  'No hay notificaciones de Banco de Venezuela en la barra.'
-                );
-                return;
-              }
-
-              Alert.alert(
-                'Escaneo completo',
-                result.created > 0
-                  ? `${shade.scanned} notificación(es) BDV · ${shade.ingested} guardada(s) · ${result.created} pago(s) detectado(s).`
-                  : `${shade.scanned} notificación(es) BDV · ${shade.ingested} guardada(s). Sin pagos nuevos.`
-              );
-            }}
+            loading={rescanning}
+            onPress={() => void handleRescanBdv()}
           />
           {canSync ? (
             <PrimaryButton
-              label={copy.ajustes.syncFromShade}
+              label={shadeSyncing ? 'Sincronizando…' : copy.ajustes.syncFromShade}
               variant="secondary"
-              onPress={() => void syncFromShade()}
+              loading={shadeSyncing}
+              onPress={() => void handleShadeSync()}
             />
           ) : null}
           {Platform.OS === 'android' ? (
@@ -391,6 +419,8 @@ export default function SettingsScreen() {
           />
         </CardContent>
       </Card>
+
+      <ActivityLogPanel />
     </AppScreen>
   );
 }

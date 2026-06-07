@@ -81,9 +81,11 @@ describe('PaymentRegisterService', () => {
   });
 
   it('creates a local payment register from a Pagomóvil notification', async () => {
-    const entry = await paymentRegisterService.ingestFromNotification(BDV_NOTIFICATION);
+    const result = await paymentRegisterService.ingestFromNotification(BDV_NOTIFICATION);
 
-    expect(entry).not.toBeNull();
+    expect(result.entry).not.toBeNull();
+    expect(result.created).toBe(true);
+    expect(result.duplicate).toBe(false);
     expect(mockUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         pago: '15000.00',
@@ -105,9 +107,11 @@ describe('PaymentRegisterService', () => {
       mobile: '0412-1222392',
     });
 
-    const entry = await paymentRegisterService.ingestFromNotification(BDV_NOTIFICATION);
+    const result = await paymentRegisterService.ingestFromNotification(BDV_NOTIFICATION);
 
-    expect(entry?.remoteRegisterId).toBe('remote-1');
+    expect(result.entry?.remoteRegisterId).toBe('remote-1');
+    expect(result.duplicate).toBe(true);
+    expect(result.created).toBe(false);
     expect(mockUpsert).not.toHaveBeenCalled();
     expect(mockEnqueue).not.toHaveBeenCalled();
   });

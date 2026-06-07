@@ -29,4 +29,8 @@ export const queryKeys = {
   apiAuth: {
     all: ['api-auth'] as const,
   },
+  activityLogs: {
+    all: ['activity-logs'] as const,
+    list: () => [...queryKeys.activityLogs.all, 'list'] as const,
+  },
 } as const;

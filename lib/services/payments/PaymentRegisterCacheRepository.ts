@@ -9,6 +9,7 @@ import { BaseStorageRepository } from '@/lib/services/base/base-storage-reposito
 import { secureStorageClient } from '@/lib/storage/secure-storage-client';
 import { logger } from '@/lib/logger';
 import { paymentRegisterStoreEnvelopeSchema } from '@/types/payment/payment-register-cache.schemas';
+import { mergeInvoiceStatus, mergeSyncStatus } from '@/lib/utils/merge-payment-register-state';
 import type {
   PaymentRegisterCacheEntry,
   PaymentRegisterListPage,
@@ -201,19 +202,15 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
         (remote.notificationKey ? this.keyIndex.get(remote.notificationKey) : undefined);
 
       if (existing) {
+        const invoiceStatus = mergeInvoiceStatus(existing.invoiceStatus, remote.invoiceStatus);
         await this.updateByLocalId(existing.localId, {
           remoteRegisterId: remote.id,
           remoteInvoiceId: remote.invoiceId,
-          invoiceStatus: remote.invoiceStatus,
-          name: remote.name,
+          invoiceStatus,
+          name: remote.name ?? existing.name,
           pago: remote.pago,
           mobile: remote.mobile,
-          syncStatus:
-            remote.invoiceStatus === 'paid'
-              ? 'payment_confirmed'
-              : existing.syncStatus === 'pending_sync'
-                ? existing.syncStatus
-                : 'synced',
+          syncStatus: mergeSyncStatus(existing.syncStatus, invoiceStatus),
         });
       }
     }

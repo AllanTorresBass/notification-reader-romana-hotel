@@ -16,6 +16,7 @@ export default function AppsTabScreen() {
     <AppScreen
       title="Banco de Venezuela"
       subtitle="Esta app solo captura notificaciones de la app móvil BDV."
+      brandLogo
     >
       <Card>
         <CardHeader
