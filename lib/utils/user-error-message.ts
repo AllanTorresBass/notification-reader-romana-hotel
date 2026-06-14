@@ -1,5 +1,6 @@
 import type { SyncErrorCode } from '@/lib/auth/auth-events';
 import { ApiError } from '@/lib/api-client/base/BaseApiClient';
+import { BACKEND_NAME } from '@/constants/backend';
 
 export type UserErrorContext = 'fetch' | 'action';
 
@@ -15,15 +16,15 @@ const TITLES: Record<UserErrorContext, string> = {
 
 const CODE_MESSAGES: Record<SyncErrorCode, string> = {
   auth_unauthorized: 'Tu sesión expiró. Ve a Ajustes e inicia sesión de nuevo.',
-  auth_forbidden: 'No tienes permiso para hacer esto en kd-gym.',
+  auth_forbidden: `No tienes permiso para hacer esto en ${BACKEND_NAME}.`,
   conflict: 'Este registro ya fue procesado o modificado en el servidor.',
   validation: 'Revisa los datos e intenta de nuevo.',
-  network: 'No hay conexión con kd-gym. Verifica tu internet e intenta otra vez.',
+  network: `No hay conexión con ${BACKEND_NAME}. Verifica tu internet e intenta otra vez.`,
   unknown: 'Ocurrió un error inesperado. Intenta de nuevo en un momento.',
 };
 
 const KNOWN_TECHNICAL_MESSAGES: Record<string, string> = {
-  'API base URL not configured': 'Configura la URL de kd-gym en Ajustes.',
+  'API base URL not configured': `Configura la URL de ${BACKEND_NAME} en Ajustes.`,
   'Not authenticated': 'Inicia sesión en Ajustes para continuar.',
   'Failed to load data': 'No pudimos cargar la información. Intenta de nuevo.',
   'Action failed': 'No se pudo completar la acción. Intenta de nuevo.',
@@ -31,7 +32,7 @@ const KNOWN_TECHNICAL_MESSAGES: Record<string, string> = {
   'Could not clear history': 'No se pudo borrar el historial.',
   'Could not apply retention': 'No se pudo aplicar la retención.',
   'Could not remove package history': 'No se pudo eliminar el historial de la app.',
-  'Sync failed': 'No se pudo sincronizar con kd-gym. Intenta de nuevo.',
+  'Sync failed': `No se pudo sincronizar con ${BACKEND_NAME}. Intenta de nuevo.`,
   'Confirm failed': 'No se pudo confirmar el pago. Intenta de nuevo.',
   'Assign failed': 'No se pudo asociar el cliente. Intenta de nuevo.',
 };

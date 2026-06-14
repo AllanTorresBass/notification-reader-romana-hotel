@@ -13,20 +13,25 @@ import { Banner } from '@/components/ui/Banner';
 import { copy } from '@/constants/copy';
 import { spacing } from '@/constants/theme';
 import { useInvoicesScreen } from '@/hooks/use-invoices-screen';
+import { useAccessDeniedNotice } from '@/hooks/use-access-denied-notice';
+import { usePermissions } from '@/hooks/use-permissions';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
 export default function InvoicesTabScreen() {
   const router = useRouter();
   const { colors } = useThemeColors();
+  const { canManageInvoices } = usePermissions();
+  const accessDenied = useAccessDeniedNotice();
   const screen = useInvoicesScreen();
 
   const openNewInvoice = () => router.push('/invoices/new');
 
-  const newInvoiceButton = screen.isAuthenticated ? (
-    <View style={styles.topAction}>
-      <PrimaryButton label={copy.facturas.newInvoice} onPress={openNewInvoice} />
-    </View>
-  ) : null;
+  const newInvoiceButton =
+    screen.isAuthenticated && canManageInvoices ? (
+      <View style={styles.topAction}>
+        <PrimaryButton label={copy.facturas.newInvoice} onPress={openNewInvoice} />
+      </View>
+    ) : null;
 
   return (
     <AppScreen
@@ -35,6 +40,16 @@ export default function InvoicesTabScreen() {
       scroll={false}
       contentStyle={styles.screenContent}
     >
+      {accessDenied ? (
+        <View style={styles.bannerWrap}>
+          <Banner
+            variant="warning"
+            message={accessDenied.message}
+            actionLabel={copy.ajustes.cancel}
+            onAction={accessDenied.dismiss}
+          />
+        </View>
+      ) : null}
       {newInvoiceButton}
       {!screen.isAuthenticated ? (
         <Banner

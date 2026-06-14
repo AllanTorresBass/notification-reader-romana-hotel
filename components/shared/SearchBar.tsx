@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { TextInput } from '@/components/ui/TextInput';
 import { spacing } from '@/constants/theme';
+import { MIN_TOUCH_TARGET, touchTargetStyle } from '@/constants/touch';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
 interface SearchBarProps {
@@ -39,7 +40,7 @@ export function SearchBar({
           accessibilityLabel={clearAccessibilityLabel}
           onPress={() => onChangeText('')}
           hitSlop={8}
-          style={styles.clearButton}
+          style={[styles.clearButton, touchTargetStyle]}
         >
           <X color={colors.textMuted} size={18} />
         </Pressable>
@@ -57,8 +58,9 @@ const styles = StyleSheet.create({
   searchIcon: { position: 'absolute', left: spacing.md + spacing.sm, zIndex: 1 },
   searchInput: {
     flex: 1,
+    minHeight: MIN_TOUCH_TARGET,
     paddingLeft: spacing.xl + spacing.sm,
-    paddingRight: spacing.xl,
+    paddingRight: spacing.xl + MIN_TOUCH_TARGET,
   },
   clearButton: {
     position: 'absolute',

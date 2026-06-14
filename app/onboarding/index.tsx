@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { KdGymLogo } from '@/components/brand/KdGymLogo';
+import { LaRomanaLogo } from '@/components/brand/LaRomanaLogo';
 import { AppScreen } from '@/components/shared/AppScreen';
 import { PrimaryButton } from '@/components/shared/PrimaryButton';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -15,7 +15,7 @@ export default function OnboardingWelcomeScreen() {
   return (
     <AppScreen title={copy.onboarding.welcomeTitle} subtitle={copy.onboarding.welcomeSubtitle}>
       <View style={styles.brand}>
-        <KdGymLogo size={80} />
+        <LaRomanaLogo size={80} showTagline />
       </View>
       <ThemedText variant="caption" muted>
         {copy.onboarding.step(1, 4)}

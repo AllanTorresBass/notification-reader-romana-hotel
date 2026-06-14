@@ -195,7 +195,7 @@ describe('formatPullSyncOutcome', () => {
     });
     expect(outcome.status).toBe('completed');
     expect(outcome.message).toContain('2 pagos nuevos importados');
-    expect(outcome.message).toContain('Datos actualizados desde kd-gym.');
+    expect(outcome.message).toContain('Datos actualizados desde La Romana.');
   });
 });
 

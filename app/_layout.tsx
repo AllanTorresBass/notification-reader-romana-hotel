@@ -1,4 +1,8 @@
 import {
+  PlayfairDisplay_400Regular,
+  PlayfairDisplay_600SemiBold,
+} from '@expo-google-fonts/playfair-display';
+import {
   Geist_400Regular,
   Geist_500Medium,
   Geist_600SemiBold,
@@ -16,7 +20,7 @@ import { ActivityIndicator, StyleSheet, useColorScheme, View } from 'react-nativ
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
-import { KdGymLogo } from '@/components/brand/KdGymLogo';
+import { LaRomanaLogo } from '@/components/brand/LaRomanaLogo';
 import { AppProviders } from '@/providers/AppProviders';
 import { spacing } from '@/constants/theme';
 import { palette, resolveThemeMode } from '@/constants/theme';
@@ -33,6 +37,8 @@ export default function RootLayout() {
   const colors = palette[resolvedTheme];
 
   const [loaded, error] = useFonts({
+    PlayfairDisplay_400Regular,
+    PlayfairDisplay_600SemiBold,
     Geist_400Regular,
     Geist_500Medium,
     Geist_600SemiBold,
@@ -55,7 +61,7 @@ export default function RootLayout() {
     return (
       <View style={[styles.boot, { backgroundColor: colors.background }]}>
         <StatusBar style={resolvedTheme === 'dark' ? 'light' : 'dark'} />
-        <KdGymLogo size={80} />
+        <LaRomanaLogo size={80} showTagline />
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );

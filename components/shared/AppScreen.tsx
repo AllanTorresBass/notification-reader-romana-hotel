@@ -2,10 +2,13 @@ import type { ReactNode } from 'react';
 import { Image, ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { KdGymLogo } from '@/components/brand/KdGymLogo';
+import { LaRomanaLogo } from '@/components/brand/LaRomanaLogo';
+import { Badge } from '@/components/ui/Badge';
 import { ThemedText } from '@/components/ui/ThemedText';
 import { spacing } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/use-theme-colors';
+import { usePermissions } from '@/hooks/use-permissions';
+import { ROLE_LABELS } from '@/types/auth.types';
 
 interface AppScreenProps {
   title?: string;
@@ -30,12 +33,13 @@ export function AppScreen({
 }: AppScreenProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useThemeColors();
+  const { role, isAuthenticated } = usePermissions();
 
   const trailing =
     headerRight || brandLogo ? (
       <View style={styles.headerRight}>
         {headerRight}
-        {brandLogo ? <KdGymLogo size={56} style={styles.brandLogo} /> : null}
+        {brandLogo ? <LaRomanaLogo size={56} style={styles.brandLogo} /> : null}
       </View>
     ) : null;
 
@@ -48,6 +52,9 @@ export function AppScreen({
           <ThemedText variant="subtitle" muted>
             {subtitle}
           </ThemedText>
+        ) : null}
+        {isAuthenticated ? (
+          <Badge label={ROLE_LABELS[role]} variant="secondary" />
         ) : null}
       </View>
       {trailing}

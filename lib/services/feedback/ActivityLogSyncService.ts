@@ -1,3 +1,4 @@
+import { BACKEND_NAME } from '@/constants/backend';
 import { activityLogApiService } from '@/lib/api-client/activity-log/ActivityLogApiService';
 import { ApiError } from '@/lib/api-client/base/BaseApiClient';
 import { logger } from '@/lib/logger';
@@ -32,7 +33,7 @@ function reportUploadFailureIfNeeded(error: unknown): void {
     reportServiceError(
       'activity_log_sync',
       error,
-      'No se pudo subir el historial de actividad a kd-gym.',
+      `No se pudo subir el historial de actividad a ${BACKEND_NAME}.`,
       { source: 'ActivityLogSyncService.flushPending', sync: false, toast: false }
     );
   });

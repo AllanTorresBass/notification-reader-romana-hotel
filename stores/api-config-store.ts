@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { KD_GYM_DEFAULT_API_URL } from '@/constants/api-defaults';
+import { LA_ROMANA_DEFAULT_API_URL } from '@/constants/api-defaults';
 import { STORAGE_KEYS } from '@/constants/storage-keys';
 import { createZustandSecureStorage } from '@/lib/storage/zustand-secure-storage';
 
@@ -17,7 +17,7 @@ interface ApiConfigState {
 export const useApiConfigStore = create<ApiConfigState>()(
   persist(
     (set) => ({
-      baseUrl: KD_GYM_DEFAULT_API_URL,
+      baseUrl: LA_ROMANA_DEFAULT_API_URL,
       defaultServiceId: null,
       lastSyncAt: null,
       setBaseUrl: (baseUrl) => set({ baseUrl: baseUrl.replace(/\/$/, '') }),

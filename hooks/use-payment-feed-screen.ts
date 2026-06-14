@@ -14,6 +14,7 @@ import {
   usePaymentFilterCountsQuery,
   usePaymentRegistersInfiniteQuery,
   usePendingLocalSyncCountQuery,
+  usePaymentSyncStatusQuery,
   useQueueRetryMutation,
 } from '@/hooks/use-payment-registers';
 import { useNotificationShadeSync } from '@/hooks/use-notification-shade-sync';
@@ -100,6 +101,7 @@ export function usePaymentFeedScreen() {
   const manualRegister = useManualRegisterMutation();
   const queueRetry = useQueueRetryMutation();
   const { data: pendingLocalSync = 0 } = usePendingLocalSyncCountQuery();
+  const { data: pendingQueueJobs = 0 } = usePaymentSyncStatusQuery();
   const { syncFromShade } = useNotificationShadeSync();
 
   const entries = useMemo(
@@ -203,6 +205,14 @@ export function usePaymentFeedScreen() {
         actionLabel: copy.ajustes.retryFailed,
         onAction: () => queueRetry.mutate(),
       });
+    } else if (pendingQueueJobs > 0 && isAuthenticated) {
+      items.push({
+        id: 'queue-pending',
+        message: copy.pagos.queuePending(pendingQueueJobs),
+        variant: 'warning',
+        actionLabel: copy.ajustes.retryFailed,
+        onAction: () => queueRetry.mutate(),
+      });
     }
 
     return items;
@@ -211,6 +221,7 @@ export function usePaymentFeedScreen() {
     isAuthenticated,
     lastSyncError,
     pendingLocalSync,
+    pendingQueueJobs,
     refreshBanner,
     actionBanner,
     router,

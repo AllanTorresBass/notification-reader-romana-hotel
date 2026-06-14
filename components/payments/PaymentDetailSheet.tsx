@@ -31,11 +31,20 @@ interface PaymentDetailSheetProps {
   onAssignClient: () => void;
   onCompleteManual?: () => void;
   isConfirming: boolean;
+  canWrite?: boolean;
 }
 
 export const PaymentDetailSheet = forwardRef<BottomSheet, PaymentDetailSheetProps>(
   function PaymentDetailSheet(
-    { entry, actionFeedback, onConfirmPayment, onAssignClient, onCompleteManual, isConfirming },
+    {
+      entry,
+      actionFeedback,
+      onConfirmPayment,
+      onAssignClient,
+      onCompleteManual,
+      isConfirming,
+      canWrite = true,
+    },
     ref
   ) {
     const router = useRouter();
@@ -152,8 +161,10 @@ export const PaymentDetailSheet = forwardRef<BottomSheet, PaymentDetailSheetProp
                   variant="warning"
                   title={copy.pagos.detail.missingFieldsTitle}
                   message={copy.pagos.detail.missingFieldsMessage(missingFields.join(' y '))}
-                  actionLabel={onCompleteManual ? copy.pagos.detail.completeManual : undefined}
-                  onAction={onCompleteManual}
+                  actionLabel={
+                    canWrite && onCompleteManual ? copy.pagos.detail.completeManual : undefined
+                  }
+                  onAction={canWrite ? onCompleteManual : undefined}
                 />
               ) : null}
 
@@ -173,7 +184,7 @@ export const PaymentDetailSheet = forwardRef<BottomSheet, PaymentDetailSheetProp
               ) : null}
 
               <View style={styles.actions}>
-                {canConfirm ? (
+                {canWrite && canConfirm ? (
                   <PrimaryButton
                     label={
                       isConfirming
@@ -186,12 +197,19 @@ export const PaymentDetailSheet = forwardRef<BottomSheet, PaymentDetailSheetProp
                   />
                 ) : null}
 
-                {canAssign ? (
+                {canWrite && canAssign ? (
                   <PrimaryButton
                     label={copy.pagos.actions.assign.assignCta}
                     variant={showNextStep || !canConfirm ? 'primary' : 'secondary'}
                     onPress={onAssignClient}
                   />
+                ) : null}
+
+                {!canWrite && (canConfirm || canAssign) ? (
+                  <ThemedText variant="caption" muted style={{ textAlign: 'center' }}>
+                    {copy.pagos.readOnlyHint} Contacta a un administrador para confirmar o asignar
+                    clientes.
+                  </ThemedText>
                 ) : null}
               </View>
             </>

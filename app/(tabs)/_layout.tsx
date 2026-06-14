@@ -2,10 +2,13 @@ import { Tabs } from 'expo-router';
 import { Bell, FileText, Settings, Smartphone } from 'lucide-react-native';
 
 import { copy } from '@/constants/copy';
+import { usePermissions } from '@/hooks/use-permissions';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
 export default function TabLayout() {
   const { colors } = useThemeColors();
+  const { can } = usePermissions();
+  const canViewInvoices = can({ resource: 'payment', action: 'read' });
 
   return (
     <Tabs
@@ -16,8 +19,10 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
+          minHeight: 56,
+          paddingBottom: 4,
         },
-        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
     >
       <Tabs.Screen
@@ -32,6 +37,7 @@ export default function TabLayout() {
         options={{
           title: copy.tabs.facturas,
           tabBarIcon: ({ color, size }) => <FileText color={color} size={size} />,
+          href: canViewInvoices ? undefined : null,
         }}
       />
       <Tabs.Screen

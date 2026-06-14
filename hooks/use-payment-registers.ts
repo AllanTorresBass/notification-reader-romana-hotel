@@ -5,6 +5,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 
+import { BACKEND_NAME } from '@/constants/backend';
 import { NOTIFICATION_PAGE_SIZE } from '@/constants/storage-keys';
 import { useAppFeedback } from '@/hooks/use-app-feedback';
 import {
@@ -125,7 +126,7 @@ export function usePullPaymentRegistersMutation() {
       invalidatePaymentQueries(queryClient);
       reportOutcome(formatPullSyncOutcome(result));
     },
-    onError: (error) => reportError('pull_sync', error, 'No se pudo sincronizar con kd-gym.', 'fetch'),
+    onError: (error) => reportError('pull_sync', error, `No se pudo sincronizar con ${BACKEND_NAME}.`, 'fetch'),
   });
 }
 

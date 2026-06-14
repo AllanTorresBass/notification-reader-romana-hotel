@@ -1,8 +1,9 @@
 import { Redirect, useRootNavigationState } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
-import { KdGymLogo } from '@/components/brand/KdGymLogo';
+import { LaRomanaLogo } from '@/components/brand/LaRomanaLogo';
 import { ThemedText } from '@/components/ui/ThemedText';
+import { copy } from '@/constants/copy';
 import { spacing } from '@/constants/theme';
 import { useAppGates } from '@/hooks/use-app-gates';
 import { useThemeColors } from '@/hooks/use-theme-colors';
@@ -15,7 +16,7 @@ export default function IndexScreen() {
   if (!navigationState?.key) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <KdGymLogo size={72} />
+        <LaRomanaLogo size={72} showTagline />
         <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
@@ -24,9 +25,9 @@ export default function IndexScreen() {
   if (!isAndroid) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <ThemedText variant="title">Solo Android</ThemedText>
+        <ThemedText variant="title">{copy.platform.androidOnlyTitle}</ThemedText>
         <ThemedText variant="body" muted style={styles.subtitle}>
-          KD-Gym Pagos requiere un dispositivo Android con acceso a notificaciones.
+          {copy.platform.androidOnlyBody}
         </ThemedText>
       </View>
     );
@@ -35,7 +36,7 @@ export default function IndexScreen() {
   if (accessLoading) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <KdGymLogo size={72} />
+        <LaRomanaLogo size={72} showTagline />
         <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );

@@ -1,3 +1,4 @@
+import { BACKEND_NAME } from '@/constants/backend';
 import { formatSyncJobFailedOutcome } from '@/lib/feedback/format-operation-outcome';
 import { reportOutcome } from '@/lib/feedback/report-feedback';
 import { withSyncRunMeta } from '@/lib/feedback/sync-run-context';
@@ -43,7 +44,7 @@ export function reportSyncJobFailure(
   jobType: string,
   localId: string,
   error: unknown,
-  fallback = 'No se pudo sincronizar con kd-gym.'
+  fallback = `No se pudo sincronizar con ${BACKEND_NAME}.`
 ): void {
   const { message } = getUserErrorMessage(error, 'action', fallback);
   pendingJobs.push({ jobType, localId, message });

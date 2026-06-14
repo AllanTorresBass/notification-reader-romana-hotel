@@ -16,9 +16,10 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { SettingRow } from '@/components/ui/SettingRow';
 import { TextInput } from '@/components/ui/TextInput';
 import { ThemedText } from '@/components/ui/ThemedText';
-import { KD_GYM_DEFAULT_API_URL } from '@/constants/api-defaults';
+import { LA_ROMANA_DEFAULT_API_URL } from '@/constants/api-defaults';
 import { copy } from '@/constants/copy';
 import { spacing, type ThemePreference } from '@/constants/theme';
+import { MIN_TOUCH_TARGET } from '@/constants/touch';
 import {
   useApiLogout,
   useApiLoginMutation,
@@ -91,7 +92,7 @@ export default function SettingsScreen() {
   const pullRegisters = usePullPaymentRegistersMutation();
   const queueRetry = useQueueRetryMutation();
   const { data: pendingJobs = 0 } = usePaymentSyncStatusQuery();
-  const [apiUrl, setApiUrl] = useState(baseUrl || KD_GYM_DEFAULT_API_URL);
+  const [apiUrl, setApiUrl] = useState(baseUrl || LA_ROMANA_DEFAULT_API_URL);
   const [staffEmail, setStaffEmail] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [staffPassword, setStaffPassword] = useState('');
@@ -186,8 +187,8 @@ export default function SettingsScreen() {
           <TextInput
             value={apiUrl}
             onChangeText={setApiUrl}
-            placeholder={KD_GYM_DEFAULT_API_URL}
-            label="URL de kd-gym"
+            placeholder={LA_ROMANA_DEFAULT_API_URL}
+            label={copy.onboarding.connectUrlLabel}
             autoCapitalize="none"
             keyboardType="url"
           />
@@ -442,8 +443,10 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 1,
     borderRadius: 8,
+    minHeight: MIN_TOUCH_TARGET,
     paddingVertical: spacing.sm,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   retentionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
 });

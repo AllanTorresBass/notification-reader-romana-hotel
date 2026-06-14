@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 
+import { BACKEND_NAME } from '@/constants/backend';
 import {
   formatLoginOutcome,
   formatLogoutOutcome,
@@ -72,6 +73,6 @@ export function useTestConnectionMutation() {
     },
     onSuccess: (result) => reportOutcome(formatTestConnectionOutcome(result)),
     onError: (error) =>
-      reportError('test_connection', error, 'No se pudo conectar con kd-gym.', 'fetch'),
+      reportError('test_connection', error, `No se pudo conectar con ${BACKEND_NAME}.`, 'fetch'),
   });
 }

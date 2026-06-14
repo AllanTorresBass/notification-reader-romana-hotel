@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/ThemedText';
 import { copy } from '@/constants/copy';
 import { fonts, radius, spacing } from '@/constants/theme';
+import { MIN_TOUCH_TARGET } from '@/constants/touch';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { getPaymentActionHint } from '@/lib/utils/filter-payment-registers';
 import { formatPagoDisplay, formatSyncStatusLabel } from '@/lib/utils/format-pago';
@@ -107,7 +108,7 @@ export function PaymentRegisterCard({ entry, onPress }: PaymentRegisterCardProps
 }
 
 const styles = StyleSheet.create({
-  card: { padding: spacing.md, gap: spacing.xs },
+  card: { padding: spacing.md, gap: spacing.xs, minHeight: MIN_TOUCH_TARGET * 2 },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',

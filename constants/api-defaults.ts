@@ -1,2 +1,5 @@
-/** Production kd-gym API (https://www.kd-gym.com/) */
-export const KD_GYM_DEFAULT_API_URL = 'https://www.kd-gym.com';
+/** Production La Romana API (Next.js app). */
+export const LA_ROMANA_DEFAULT_API_URL = 'https://la-romana-hotel.vercel.app';
+
+/** Human-readable backend name shown in UI copy. */
+export const BACKEND_NAME = 'La Romana';

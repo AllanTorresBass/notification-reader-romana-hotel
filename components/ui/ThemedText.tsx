@@ -13,8 +13,8 @@ interface ThemedTextProps extends TextProps {
 }
 
 const variantStyles: Record<TextVariant, TextStyle> = {
-  heading: { ...typography.heading, fontFamily: fonts.sansBold },
-  title: { ...typography.title, fontFamily: fonts.sansBold },
+  heading: { ...typography.heading, fontFamily: fonts.heading },
+  title: { ...typography.title, fontFamily: fonts.heading },
   subtitle: { ...typography.subtitle, fontFamily: fonts.sans },
   body: { ...typography.body, fontFamily: fonts.sans },
   caption: { ...typography.caption, fontFamily: fonts.sans },

@@ -20,6 +20,7 @@ import {
 } from '@/lib/utils/bdv-pagomovil-parser';
 import { buildDedupeKey } from '@/lib/utils/notification-normalizer';
 import { notificationRecordToParseInput } from '@/lib/utils/notification-text';
+import { BACKEND_NAME } from '@/constants/backend';
 import { getUserErrorMessage } from '@/lib/utils/user-error-message';
 import { useApiConfigStore } from '@/stores/api-config-store';
 import { useApiAuthStore } from '@/stores/api-auth-store';
@@ -300,7 +301,7 @@ export class PaymentRegisterService {
       } catch (error) {
         failed += 1;
         const apiError = error instanceof ApiError ? error : null;
-        const message = getUserErrorMessage(error, 'action', 'No se pudo sincronizar con kd-gym.').message;
+        const message = getUserErrorMessage(error, 'action', `No se pudo sincronizar con ${BACKEND_NAME}.`).message;
 
         reportSyncJobFailure(job.type, job.localId, error);
 
@@ -312,7 +313,7 @@ export class PaymentRegisterService {
         if (apiError?.code === 'auth_forbidden') {
           await paymentRegisterCacheRepository.updateByLocalId(job.localId, {
             syncStatus: 'sync_failed',
-            lastSyncError: 'Permisos insuficientes en kd-gym.',
+            lastSyncError: `Permisos insuficientes en ${BACKEND_NAME}.`,
           });
           await paymentSyncQueue.removeJob(job.id);
           continue;

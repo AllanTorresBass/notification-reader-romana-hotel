@@ -38,7 +38,6 @@ export default function NewInvoiceScreen() {
   const { colors } = useThemeColors();
   const { data: services, isLoading: servicesLoading } = useActiveGymServicesQuery();
   const navigateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const wizard = useInvoiceWizard();
   const [actionFeedback, setActionFeedback] = useState<OperationOutcome | null>(null);
 

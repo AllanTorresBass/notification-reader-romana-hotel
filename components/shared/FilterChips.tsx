@@ -2,6 +2,7 @@ import { Pressable, ScrollView, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/ui/ThemedText';
 import { radius, spacing } from '@/constants/theme';
+import { MIN_TOUCH_TARGET } from '@/constants/touch';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
 interface FilterChipsProps<T extends string> {
@@ -50,6 +51,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.full,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    minHeight: MIN_TOUCH_TARGET,
+    justifyContent: 'center',
   },
 });

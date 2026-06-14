@@ -8,6 +8,7 @@ import { authApiService } from '@/lib/api-client/auth/AuthApiService';
 import { ApiError } from '@/lib/api-client/base/BaseApiClient';
 import { paymentRegisterService } from '@/lib/services/payments/PaymentRegisterService';
 import { paymentSyncQueue } from '@/lib/services/sync/payment-sync-queue';
+import { BACKEND_NAME } from '@/constants/backend';
 import { getUserErrorMessage } from '@/lib/utils/user-error-message';
 import { useApiAuthStore } from '@/stores/api-auth-store';
 import { useApiConfigStore } from '@/stores/api-config-store';
@@ -138,7 +139,7 @@ export class PaymentSyncOrchestrator {
     } catch (error) {
       const apiError = error instanceof ApiError ? error : null;
       errorCode = apiError?.code ?? 'unknown';
-      errorMessage = getUserErrorMessage(error, 'action', 'No se pudo sincronizar con kd-gym.').message;
+      errorMessage = getUserErrorMessage(error, 'action', `No se pudo sincronizar con ${BACKEND_NAME}.`).message;
       useApiAuthStore.getState().setLastSyncError(errorMessage);
       logger.warn('Payment sync orchestrator failed', { reason, errorCode, errorMessage });
     } finally {

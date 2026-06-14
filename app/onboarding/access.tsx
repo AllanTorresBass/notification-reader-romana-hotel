@@ -7,6 +7,7 @@ import { PrimaryButton } from '@/components/shared/PrimaryButton';
 import { Card, CardContent } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/ThemedText';
 import { copy } from '@/constants/copy';
+import { LA_ROMANA_APP_NAME } from '@/constants/la-romana-brand';
 import { spacing } from '@/constants/theme';
 import { useNotificationAccessQuery } from '@/hooks/use-notification-access';
 import { useThemeColors } from '@/hooks/use-theme-colors';
@@ -36,8 +37,8 @@ export default function OnboardingAccessScreen() {
         <CardContent style={styles.card}>
           <Shield color={colors.primary} size={40} />
           <ThemedText variant="body" muted style={styles.body}>
-            Abre Ajustes de Android y activa el acceso a notificaciones para KD-Gym Pagos. Vuelve
-            aquí y pulsa Continuar.
+            Abre Ajustes de Android y activa el acceso a notificaciones para {LA_ROMANA_APP_NAME}.
+            Vuelve aquí y pulsa Continuar.
           </ThemedText>
         </CardContent>
       </Card>

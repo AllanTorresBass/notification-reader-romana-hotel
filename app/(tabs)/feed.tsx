@@ -1,8 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
-import { Plus } from 'lucide-react-native';
 import {
   ActivityIndicator,
-  Pressable,
   RefreshControl,
   StyleSheet,
   View,
@@ -11,6 +9,7 @@ import {
 import { AssignClientSheet } from '@/components/payments/AssignClientSheet';
 import { ManualRegisterForm } from '@/components/payments/ManualRegisterForm';
 import { PaymentDetailSheet } from '@/components/payments/PaymentDetailSheet';
+import { PagosManualRegisterButton } from '@/components/payments/PagosManualRegisterButton';
 import { PaymentFilterBar } from '@/components/payments/PaymentFilterBar';
 import { PaymentRegisterCard } from '@/components/payments/PaymentRegisterCard';
 import { PaymentTimelineSectionHeader } from '@/components/payments/PaymentTimelineSectionHeader';
@@ -22,22 +21,16 @@ import { BannerStack } from '@/components/ui/Banner';
 import { copy } from '@/constants/copy';
 import { spacing } from '@/constants/theme';
 import { usePaymentFeedScreen } from '@/hooks/use-payment-feed-screen';
+import { usePermissions } from '@/hooks/use-permissions';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
 export default function PagosScreen() {
   const { colors } = useThemeColors();
+  const { canWritePayments } = usePermissions();
   const feed = usePaymentFeedScreen();
 
   const headerRight = (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={copy.pagos.manualRegister}
-      onPress={feed.openManualRegister}
-      hitSlop={8}
-      style={styles.headerButton}
-    >
-      <Plus color={colors.primary} size={24} />
-    </Pressable>
+    <PagosManualRegisterButton visible={canWritePayments} onPress={feed.openManualRegister} />
   );
 
   const filterBar = !feed.cacheEmpty && !feed.showManual ? (
@@ -103,10 +96,12 @@ export default function PagosScreen() {
           title={copy.pagos.emptyTitle}
           description={copy.pagos.emptyDescription}
           action={
-            <PrimaryButton
-              label={copy.pagos.manualRegister}
-              onPress={feed.openManualRegister}
-            />
+            canWritePayments ? (
+              <PrimaryButton
+                label={copy.pagos.manualRegister}
+                onPress={feed.openManualRegister}
+              />
+            ) : undefined
           }
         />
       ) : null}
@@ -170,6 +165,7 @@ export default function PagosScreen() {
         onAssignClient={feed.handleAssignClient}
         onCompleteManual={feed.handleCompleteManual}
         isConfirming={feed.confirmPayment.isPending}
+        canWrite={canWritePayments}
       />
 
       <AssignClientSheet
@@ -188,5 +184,4 @@ const styles = StyleSheet.create({
   skeletons: { gap: spacing.md, padding: spacing.md },
   list: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
   footer: { paddingVertical: spacing.md },
-  headerButton: { padding: spacing.xs },
 });
