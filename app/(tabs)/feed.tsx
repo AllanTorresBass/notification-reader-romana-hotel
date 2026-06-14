@@ -1,98 +1,59 @@
-import BottomSheet from '@gorhom/bottom-sheet';
 import { FlashList } from '@shopify/flash-list';
-import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
-  ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native';
 
-import { NotificationCard } from '@/components/notifications/NotificationCard';
-import { NotificationDetailSheet } from '@/components/notifications/NotificationDetailSheet';
+import { AssignClientSheet } from '@/components/payments/AssignClientSheet';
+import { ManualRegisterForm } from '@/components/payments/ManualRegisterForm';
+import { PaymentDetailSheet } from '@/components/payments/PaymentDetailSheet';
+import { PagosManualRegisterButton } from '@/components/payments/PagosManualRegisterButton';
+import { PaymentFilterBar } from '@/components/payments/PaymentFilterBar';
+import { PaymentRegisterCard } from '@/components/payments/PaymentRegisterCard';
+import { PaymentTimelineSectionHeader } from '@/components/payments/PaymentTimelineSectionHeader';
 import { AppScreen } from '@/components/shared/AppScreen';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { FilterChips } from '@/components/shared/FilterChips';
+import { PrimaryButton } from '@/components/shared/PrimaryButton';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';
+import { BannerStack } from '@/components/ui/Banner';
+import { copy } from '@/constants/copy';
 import { spacing } from '@/constants/theme';
-import { useNotificationShadeSync } from '@/hooks/use-notification-shade-sync';
-import { useNotificationsInfiniteQuery } from '@/hooks/use-notifications';
+import { usePaymentFeedScreen } from '@/hooks/use-payment-feed-screen';
+import { usePermissions } from '@/hooks/use-permissions';
 import { useThemeColors } from '@/hooks/use-theme-colors';
-import { groupNotificationsByDate } from '@/lib/utils/group-notifications';
-import type { NotificationRecord } from '@/types/notification/notification.types';
-import { useWhitelistStore } from '@/stores/whitelist-store';
 
-type ListItem =
-  | { type: 'header'; title: string; key: string }
-  | { type: 'notification'; record: NotificationRecord; key: string };
-
-export default function FeedScreen() {
+export default function PagosScreen() {
   const { colors } = useThemeColors();
-  const appLabels = useWhitelistStore((s) => s.appLabels);
-  const allowedPackages = useWhitelistStore((s) => s.allowedPackages);
-  const [search, setSearch] = useState('');
-  const [packageFilter, setPackageFilter] = useState<string | null>(null);
-  const [selected, setSelected] = useState<NotificationRecord | null>(null);
-  const sheetRef = useRef<BottomSheet>(null);
+  const { canWritePayments } = usePermissions();
+  const feed = usePaymentFeedScreen();
 
-  const filters = useMemo(
-    () => ({
-      search: search || undefined,
-      packageName: packageFilter ?? undefined,
-    }),
-    [search, packageFilter]
+  const headerRight = (
+    <PagosManualRegisterButton visible={canWritePayments} onPress={feed.openManualRegister} />
   );
 
-  const { syncFromShade, canSync } = useNotificationShadeSync();
-  const { data, isLoading, isFetchingNextPage, fetchNextPage, hasNextPage, refetch, isRefetching } =
-    useNotificationsInfiniteQuery(filters);
+  const filterBar = !feed.cacheEmpty && !feed.showManual ? (
+    <PaymentFilterBar
+      status={feed.statusFilter}
+      search={feed.searchInput}
+      counts={feed.filterCounts}
+      filteredTotal={feed.filteredTotal}
+      onStatusChange={feed.setStatusFilter}
+      onSearchChange={feed.setSearchInput}
+    />
+  ) : null;
 
-  const refreshFeed = useCallback(async () => {
-    if (canSync) {
-      await syncFromShade();
-    }
-    await refetch();
-  }, [canSync, syncFromShade, refetch]);
-
-  const records = useMemo(
-    () => data?.pages.flatMap((page) => page.items) ?? [],
-    [data]
-  );
-
-  const listItems = useMemo((): ListItem[] => {
-    const sections = groupNotificationsByDate(records);
-    const items: ListItem[] = [];
-    for (const section of sections) {
-      items.push({ type: 'header', title: section.title, key: `h-${section.title}` });
-      for (const record of section.data) {
-        items.push({ type: 'notification', record, key: record.id });
-      }
-    }
-    return items;
-  }, [records]);
-
-  const chipOptions = useMemo(
-    () =>
-      allowedPackages.map((pkg) => ({
-        id: pkg,
-        label: appLabels[pkg] ?? pkg.split('.').pop() ?? pkg,
-      })),
-    [allowedPackages, appLabels]
-  );
-
-  const openDetail = useCallback((record: NotificationRecord) => {
-    setSelected(record);
-    sheetRef.current?.expand();
-  }, []);
-
-  if (isLoading) {
+  if (feed.isLoading) {
     return (
-      <AppScreen title="Feed" subtitle="Loading notifications..." scroll={false}>
+      <AppScreen
+        title={copy.pagos.title}
+        subtitle={copy.pagos.loading}
+        scroll={false}
+        brandLogo
+        headerRight={headerRight}
+      >
         <View style={styles.skeletons}>
-          <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
         </View>
@@ -102,119 +63,125 @@ export default function FeedScreen() {
 
   return (
     <AppScreen
-      title="Feed"
-      subtitle={`${records.length} shown`}
+      title={copy.pagos.title}
+      subtitle={copy.pagos.subtitle}
       scroll={false}
-      contentStyle={styles.feedContent}
+      brandLogo
+      headerRight={headerRight}
     >
-      <TextInput
-        accessibilityLabel="Search notifications"
-        placeholder="Search..."
-        placeholderTextColor={colors.textMuted}
-        value={search}
-        onChangeText={setSearch}
-        style={[
-          styles.search,
-          { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface },
-        ]}
-      />
-      <FilterChips
-        options={chipOptions}
-        selectedId={packageFilter}
-        onSelect={setPackageFilter}
-      />
-      {listItems.length === 0 ? (
-        <ScrollView
-          contentContainerStyle={styles.emptyScroll}
+      <BannerStack items={feed.banners} />
+
+      {feed.showManual ? (
+        <ManualRegisterForm
+          name={feed.manualName}
+          pago={feed.manualPago}
+          mobile={feed.manualMobile}
+          ref={feed.manualRef}
+          paymentDate={feed.manualDate}
+          paymentTime={feed.manualTime}
+          onChangeName={feed.setManualName}
+          onChangePago={feed.setManualPago}
+          onChangeMobile={feed.setManualMobile}
+          onChangeRef={feed.setManualRef}
+          onChangePaymentDate={feed.setManualDate}
+          onChangePaymentTime={feed.setManualTime}
+          onSubmit={feed.submitManual}
+          onCancel={() => feed.setShowManual(false)}
+          isSubmitting={feed.manualRegister.isPending}
+        />
+      ) : null}
+
+      {feed.cacheEmpty && !feed.showManual ? (
+        <EmptyState
+          title={copy.pagos.emptyTitle}
+          description={copy.pagos.emptyDescription}
+          action={
+            canWritePayments ? (
+              <PrimaryButton
+                label={copy.pagos.manualRegister}
+                onPress={feed.openManualRegister}
+              />
+            ) : undefined
+          }
+        />
+      ) : null}
+
+      {!feed.cacheEmpty && !feed.showManual && feed.entries.length === 0 ? (
+        <>
+          {filterBar}
+          <EmptyState
+            title={copy.pagos.filters.emptyTitle}
+            description={copy.pagos.filters.emptyDescription}
+            action={
+              feed.hasActiveFilter ? (
+                <PrimaryButton
+                  label={copy.pagos.filters.clearFilters}
+                  onPress={feed.clearFilters}
+                />
+              ) : undefined
+            }
+          />
+        </>
+      ) : null}
+
+      {!feed.cacheEmpty && !feed.showManual && feed.entries.length > 0 ? (
+        <FlashList
+          data={feed.listRows}
+          keyExtractor={(item) => item.key}
+          getItemType={(item) => item.type}
+          contentContainerStyle={styles.list}
+          ListHeaderComponent={filterBar}
           refreshControl={
             <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={() => void refreshFeed()}
-              tintColor={colors.accent}
+              refreshing={feed.isRefetching}
+              onRefresh={() => void feed.refresh()}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
             />
           }
-        >
-          <EmptyState
-            title="No notifications yet"
-            description={
-              canSync
-                ? 'Pull down to sync alerts still in your notification shade. Cleared alerts cannot be recovered on Android.'
-                : 'Enable notification access and whitelist an app in the Apps tab.'
-            }
-          />
-        </ScrollView>
-      ) : (
-        <View style={styles.listContainer}>
-          <FlashList
-            data={listItems}
-            keyExtractor={(item) => item.key}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefetching}
-                onRefresh={() => void refreshFeed()}
-                tintColor={colors.accent}
-              />
-            }
-            onEndReached={() => {
-              if (hasNextPage && !isFetchingNextPage) {
-                void fetchNextPage();
-              }
-            }}
-            onEndReachedThreshold={0.3}
-            renderItem={({ item }) => {
-              if (item.type === 'header') {
-                return (
-                  <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-                    {item.title}
-                  </Text>
-                );
-              }
-              return (
-                <View style={styles.cardWrap}>
-                  <NotificationCard record={item.record} onPress={openDetail} />
-                </View>
-              );
-            }}
-            ListFooterComponent={
-              isFetchingNextPage ? (
-                <ActivityIndicator color={colors.accent} style={styles.footer} />
-              ) : null
-            }
-          />
-        </View>
-      )}
-      <NotificationDetailSheet
-        ref={sheetRef}
-        record={selected}
-        onClose={() => {
-          setSelected(null);
-          sheetRef.current?.close();
-        }}
+          onEndReached={() => {
+            if (feed.hasNextPage) void feed.fetchNextPage();
+          }}
+          renderItem={({ item }) =>
+            item.type === 'header' ? (
+              <PaymentTimelineSectionHeader title={item.title} />
+            ) : (
+              <PaymentRegisterCard entry={item.entry} onPress={feed.openDetail} />
+            )
+          }
+          ListFooterComponent={
+            feed.hasNextPage ? (
+              <ActivityIndicator color={colors.primary} style={styles.footer} />
+            ) : null
+          }
+        />
+      ) : null}
+
+      <PaymentDetailSheet
+        ref={feed.detailRef}
+        entry={feed.selected}
+        actionFeedback={feed.detailFeedback}
+        onConfirmPayment={feed.handleConfirmPayment}
+        onAssignClient={feed.handleAssignClient}
+        onCompleteManual={feed.handleCompleteManual}
+        isConfirming={feed.confirmPayment.isPending}
+        canWrite={canWritePayments}
+      />
+
+      <AssignClientSheet
+        ref={feed.assignRef}
+        onAssign={feed.handleAssign}
+        onBack={feed.handleBackFromAssign}
+        isAssigning={feed.assignClient.isPending}
+        assigningClientId={feed.assigningClientId}
+        resetToken={feed.assignSheetResetToken}
       />
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  feedContent: { flex: 1 },
-  search: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: 16,
-    marginBottom: spacing.sm,
-  },
-  listContainer: { flex: 1, minHeight: 300 },
-  emptyScroll: { flexGrow: 1, justifyContent: 'center' },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginVertical: spacing.sm,
-  },
-  cardWrap: { marginBottom: spacing.sm },
-  skeletons: { gap: spacing.sm, padding: spacing.md },
-  footer: { padding: spacing.md },
+  skeletons: { gap: spacing.md, padding: spacing.md },
+  list: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
+  footer: { paddingVertical: spacing.md },
 });

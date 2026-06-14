@@ -4,7 +4,8 @@ import ExpoAndroidNotificationListenerService, {
 } from 'expo-android-notification-listener-service';
 import type { EventSubscription } from 'expo-modules-core';
 
-import { logger } from '@/lib/logger';
+import { reportServiceError } from '@/lib/feedback/report-service-error';
+import { copy } from '@/constants/copy';
 
 export class NotificationListenerBridge {
   isSupported(): boolean {
@@ -18,7 +19,12 @@ export class NotificationListenerBridge {
     try {
       return ExpoAndroidNotificationListenerService.isNotificationPermissionGranted();
     } catch (error) {
-      logger.error('Failed to check notification access', { error: String(error) });
+      reportServiceError(
+        'listener_bridge_failure',
+        error,
+        copy.feedback.infra.listenerBridgeMessage,
+        { source: 'NotificationListenerBridge.isAccessGranted' }
+      );
       return false;
     }
   }
@@ -50,7 +56,12 @@ export class NotificationListenerBridge {
       }
       return mod.pullQueuedNotifications();
     } catch (error) {
-      logger.error('Failed to pull queued notifications', { error: String(error) });
+      reportServiceError(
+        'listener_bridge_failure',
+        error,
+        copy.feedback.infra.listenerBridgeMessage,
+        { source: 'NotificationListenerBridge.pullQueuedNotifications' }
+      );
       return [];
     }
   }
@@ -68,8 +79,59 @@ export class NotificationListenerBridge {
       }
       return mod.syncActiveNotifications();
     } catch (error) {
-      logger.error('Failed to sync active notifications', { error: String(error) });
+      reportServiceError(
+        'listener_bridge_failure',
+        error,
+        copy.feedback.infra.listenerBridgeMessage,
+        { source: 'NotificationListenerBridge.syncActiveNotifications' }
+      );
       return 0;
+    }
+  }
+
+  getActiveNotifications(): NotificationData[] {
+    if (!this.isSupported()) {
+      return [];
+    }
+    try {
+      const mod = ExpoAndroidNotificationListenerService as typeof ExpoAndroidNotificationListenerService & {
+        getActiveNotifications?: () => NotificationData[];
+      };
+      if (typeof mod.getActiveNotifications !== 'function') {
+        return [];
+      }
+      return mod.getActiveNotifications();
+    } catch (error) {
+      reportServiceError(
+        'listener_bridge_failure',
+        error,
+        copy.feedback.infra.listenerBridgeMessage,
+        { source: 'NotificationListenerBridge.getActiveNotifications' }
+      );
+      return [];
+    }
+  }
+
+  isListenerConnected(): boolean {
+    if (!this.isSupported()) {
+      return false;
+    }
+    try {
+      const mod = ExpoAndroidNotificationListenerService as typeof ExpoAndroidNotificationListenerService & {
+        isListenerConnected?: () => boolean;
+      };
+      if (typeof mod.isListenerConnected !== 'function') {
+        return false;
+      }
+      return mod.isListenerConnected();
+    } catch (error) {
+      reportServiceError(
+        'listener_bridge_failure',
+        error,
+        copy.feedback.infra.listenerBridgeMessage,
+        { source: 'NotificationListenerBridge.isListenerConnected' }
+      );
+      return false;
     }
   }
 

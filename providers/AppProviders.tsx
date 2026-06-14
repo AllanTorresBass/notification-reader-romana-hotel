@@ -4,7 +4,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { useNotificationListener } from '@/hooks/use-notification-listener';
+import { usePaymentSyncHost } from '@/hooks/use-payment-sync-host';
+import { reportServiceError } from '@/lib/feedback/report-service-error';
+import { activityLogSyncService } from '@/lib/services/feedback/ActivityLogSyncService';
 import { notificationService } from '@/lib/services/notifications/NotificationService';
+import { useActivityLogStore } from '@/stores/activity-log-store';
 import { usePreferencesStore } from '@/stores/preferences-store';
 
 interface AppProvidersProps {
@@ -13,13 +17,47 @@ interface AppProvidersProps {
 
 function NotificationListenerHost() {
   useNotificationListener();
+  usePaymentSyncHost();
 
   useEffect(() => {
+    void useActivityLogStore.getState().hydrate();
     const retentionDays = usePreferencesStore.getState().retentionDays;
     void notificationService.purgeRetention(retentionDays);
+    void activityLogSyncService.flushPending();
   }, []);
 
   return null;
+}
+
+function installGlobalErrorHandlers(): void {
+  const errorUtils = (
+    globalThis as typeof globalThis & {
+      ErrorUtils?: {
+        getGlobalHandler?: () => ((error: Error, isFatal?: boolean) => void) | undefined;
+        setGlobalHandler?: (handler: (error: Error, isFatal?: boolean) => void) => void;
+      };
+    }
+  ).ErrorUtils;
+
+  if (!errorUtils?.setGlobalHandler) {
+    return;
+  }
+
+  const previousHandler = errorUtils.getGlobalHandler?.();
+
+  errorUtils.setGlobalHandler((error, isFatal) => {
+    reportServiceError(
+      'unhandled_exception',
+      error,
+      'La app encontró un error inesperado.',
+      {
+        source: 'global.ErrorUtils',
+        reason: isFatal ? 'fatal' : 'non_fatal',
+        toast: false,
+      }
+    );
+    previousHandler?.(error, isFatal);
+  });
 }
 
 export function AppProviders({ children }: AppProvidersProps) {
@@ -34,6 +72,10 @@ export function AppProviders({ children }: AppProvidersProps) {
         },
       })
   );
+
+  useEffect(() => {
+    installGlobalErrorHandlers();
+  }, []);
 
   return (
     <GestureHandlerRootView style={styles.root}>

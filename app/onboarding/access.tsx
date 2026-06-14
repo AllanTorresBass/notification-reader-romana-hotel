@@ -1,38 +1,56 @@
 import { useRouter } from 'expo-router';
 import { Shield } from 'lucide-react-native';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { AppScreen } from '@/components/shared/AppScreen';
 import { PrimaryButton } from '@/components/shared/PrimaryButton';
+import { Card, CardContent } from '@/components/ui/Card';
+import { ThemedText } from '@/components/ui/ThemedText';
+import { copy } from '@/constants/copy';
+import { LA_ROMANA_APP_NAME } from '@/constants/la-romana-brand';
 import { spacing } from '@/constants/theme';
 import { useNotificationAccessQuery } from '@/hooks/use-notification-access';
 import { useThemeColors } from '@/hooks/use-theme-colors';
+import { formatAccessCheckOutcome } from '@/lib/feedback/format-operation-outcome';
+import { reportOutcome } from '@/lib/feedback/report-feedback';
 
 export default function OnboardingAccessScreen() {
   const router = useRouter();
   const { colors } = useThemeColors();
   const { hasAccess, openSettings, refetch } = useNotificationAccessQuery();
 
+  const checkAccess = async () => {
+    const result = await refetch();
+    const granted = result.data ?? hasAccess;
+    reportOutcome(formatAccessCheckOutcome(granted), { toast: true, log: true });
+  };
+
   return (
-    <AppScreen title="Notification access" subtitle="Required to read alerts from whitelisted apps.">
-      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Shield color={colors.accent} size={40} />
-        <Text style={[styles.body, { color: colors.textMuted }]}>
-          Open Android Settings and enable Notification access for Notification Reader. Return here
-          and tap Continue.
-        </Text>
-      </View>
-      <PrimaryButton label="Open settings" onPress={openSettings} />
+    <AppScreen
+      title="Acceso a notificaciones"
+      subtitle="Necesario para leer alertas de Banco de Venezuela."
+    >
+      <ThemedText variant="caption" muted>
+        {copy.onboarding.step(2, 4)}
+      </ThemedText>
+      <Card>
+        <CardContent style={styles.card}>
+          <Shield color={colors.primary} size={40} />
+          <ThemedText variant="body" muted style={styles.body}>
+            Abre Ajustes de Android y activa el acceso a notificaciones para {LA_ROMANA_APP_NAME}.
+            Vuelve aquí y pulsa Continuar.
+          </ThemedText>
+        </CardContent>
+      </Card>
+      <PrimaryButton label="Abrir ajustes" onPress={openSettings} />
       <PrimaryButton
-        label="I've enabled access"
+        label="Ya activé el acceso"
         variant="secondary"
-        onPress={async () => {
-          await refetch();
-        }}
+        onPress={() => void checkAccess()}
       />
       <PrimaryButton
-        label="Continue"
-        onPress={() => router.push('/onboarding/apps')}
+        label="Continuar"
+        onPress={() => router.push('/onboarding/battery')}
         disabled={!hasAccess}
       />
     </AppScreen>
@@ -40,12 +58,6 @@ export default function OnboardingAccessScreen() {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: spacing.lg,
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  body: { fontSize: 15, lineHeight: 22, textAlign: 'center' },
+  card: { alignItems: 'center', gap: spacing.md },
+  body: { textAlign: 'center' },
 });

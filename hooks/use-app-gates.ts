@@ -7,9 +7,9 @@ export function useAppGates() {
   const hasCompletedOnboarding = useWhitelistStore((s) => s.hasCompletedOnboarding);
 
   const needsAccess = isAndroid && !hasAccess;
-  const needsWhitelist = allowedPackages.length === 0;
-  const needsOnboarding = !hasCompletedOnboarding || needsAccess || needsWhitelist;
-  const isReady = isAndroid && hasAccess && allowedPackages.length > 0 && hasCompletedOnboarding;
+  const needsWhitelist = false;
+  const needsOnboarding = !hasCompletedOnboarding || needsAccess;
+  const isReady = isAndroid && hasAccess && hasCompletedOnboarding;
 
   return {
     isAndroid,

@@ -1,9 +1,14 @@
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Image, ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { LaRomanaLogo } from '@/components/brand/LaRomanaLogo';
+import { Badge } from '@/components/ui/Badge';
+import { ThemedText } from '@/components/ui/ThemedText';
 import { spacing } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/use-theme-colors';
+import { usePermissions } from '@/hooks/use-permissions';
+import { ROLE_LABELS } from '@/types/auth.types';
 
 interface AppScreenProps {
   title?: string;
@@ -11,7 +16,9 @@ interface AppScreenProps {
   children: ReactNode;
   scroll?: boolean;
   headerRight?: ReactNode;
+  brandLogo?: boolean;
   contentStyle?: ViewStyle;
+  logo?: number;
 }
 
 export function AppScreen({
@@ -20,20 +27,37 @@ export function AppScreen({
   children,
   scroll = true,
   headerRight,
+  brandLogo = false,
   contentStyle,
+  logo,
 }: AppScreenProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useThemeColors();
+  const { role, isAuthenticated } = usePermissions();
+
+  const trailing =
+    headerRight || brandLogo ? (
+      <View style={styles.headerRight}>
+        {headerRight}
+        {brandLogo ? <LaRomanaLogo size={56} style={styles.brandLogo} /> : null}
+      </View>
+    ) : null;
 
   const header = title ? (
     <View style={styles.headerRow}>
       <View style={styles.headerText}>
-        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+        {logo ? <Image source={logo} style={styles.logo} resizeMode="contain" /> : null}
+        <ThemedText variant="heading">{title}</ThemedText>
         {subtitle ? (
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text>
+          <ThemedText variant="subtitle" muted>
+            {subtitle}
+          </ThemedText>
+        ) : null}
+        {isAuthenticated ? (
+          <Badge label={ROLE_LABELS[role]} variant="secondary" />
         ) : null}
       </View>
-      {headerRight}
+      {trailing}
     </View>
   ) : null;
 
@@ -78,8 +102,16 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   headerText: { flex: 1, gap: spacing.xs },
-  title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
-  subtitle: { fontSize: 14, lineHeight: 20 },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginLeft: spacing.sm,
+  },
+  brandLogo: {
+    marginRight: '5%',
+  },
+  logo: { width: 40, height: 40, marginBottom: spacing.xs },
   content: { paddingHorizontal: spacing.md, gap: spacing.md },
   contentFlex: { flex: 1, paddingHorizontal: spacing.md, gap: spacing.md },
 });

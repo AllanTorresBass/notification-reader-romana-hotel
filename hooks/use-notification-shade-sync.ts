@@ -2,31 +2,34 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { Platform } from 'react-native';
 
+import { ALLOWED_PACKAGES } from '@/constants/whitelist-defaults';
 import { queryKeys } from '@/lib/query-keys';
-import { syncNotificationsFromShade } from '@/lib/services/native/notification-shade-sync';
+import {
+  syncNotificationsFromShade,
+  type NotificationShadeSyncResult,
+} from '@/lib/services/native/notification-shade-sync';
 import { usePreferencesStore } from '@/stores/preferences-store';
-import { useWhitelistStore } from '@/stores/whitelist-store';
 
 export function useNotificationShadeSync() {
   const queryClient = useQueryClient();
-  const allowedPackages = useWhitelistStore((s) => s.allowedPackages);
   const retentionDays = usePreferencesStore((s) => s.retentionDays);
   const captureRawPayload = usePreferencesStore((s) => s.captureRawPayload);
 
-  const syncFromShade = useCallback(async () => {
-    if (Platform.OS !== 'android' || allowedPackages.length === 0) {
-      return { scanned: 0, ingested: 0 };
+  const syncFromShade = useCallback(async (): Promise<NotificationShadeSyncResult> => {
+    if (Platform.OS !== 'android') {
+      return { scanned: 0, ingested: 0, listenerConnected: false };
     }
     const result = await syncNotificationsFromShade({
-      allowedPackages,
+      allowedPackages: [...ALLOWED_PACKAGES],
       retentionDays,
       captureRawPayload,
     });
-    if (result.ingested > 0) {
+    if (result.ingested > 0 || result.scanned > 0) {
       await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.lists() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.lists() });
     }
     return result;
-  }, [allowedPackages, retentionDays, captureRawPayload, queryClient]);
+  }, [retentionDays, captureRawPayload, queryClient]);
 
-  return { syncFromShade, canSync: Platform.OS === 'android' && allowedPackages.length > 0 };
+  return { syncFromShade, canSync: Platform.OS === 'android' };
 }
