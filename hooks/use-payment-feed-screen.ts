@@ -43,7 +43,7 @@ import type {
   PaymentStatusFilter,
 } from '@/types/payment/payment-register-cache.types';
 
-const DEFAULT_STATUS_FILTER: PaymentStatusFilter = 'needs_action';
+const DEFAULT_STATUS_FILTER: PaymentStatusFilter = 'all';
 
 export function usePaymentFeedScreen() {
   const router = useRouter();
