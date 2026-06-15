@@ -13,6 +13,22 @@ import { notificationService } from '@/lib/services/notifications/NotificationSe
 import { paymentRegisterService } from '@/lib/services/payments/PaymentRegisterService';
 import { usePreferencesStore } from '@/stores/preferences-store';
 
+async function invalidateCaptureQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  outcome: { stored: boolean; paymentCreated: boolean }
+): Promise<void> {
+  if (!outcome.stored && !outcome.paymentCreated) {
+    return;
+  }
+
+  if (outcome.stored) {
+    await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.lists() });
+  }
+  if (outcome.paymentCreated) {
+    await queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.lists() });
+  }
+}
+
 export function useNotificationListener() {
   const queryClient = useQueryClient();
   const retentionDays = usePreferencesStore((s) => s.retentionDays);
@@ -30,8 +46,10 @@ export function useNotificationListener() {
         captureRawPayload,
       });
 
-      if (shade.ingested > 0) {
-        await paymentRegisterService.reprocessStoredNotifications();
+      if (shade.stored > 0 || shade.ingested > 0) {
+        if (shade.stored > shade.ingested) {
+          await paymentRegisterService.reprocessStoredNotifications();
+        }
         await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.lists() });
         await queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.lists() });
       }
@@ -63,15 +81,12 @@ export function useNotificationListener() {
 
     const subscription = notificationListenerBridge.subscribe(async (event) => {
       try {
-        const ingested = await ingestNotificationWithFeedback(event, {
+        const outcome = await ingestNotificationWithFeedback(event, {
           retentionDays,
           captureRawPayload,
           source: 'notification-listener',
         });
-        if (ingested) {
-          await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.lists() });
-          await queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.lists() });
-        }
+        await invalidateCaptureQueries(queryClient, outcome);
       } catch (error) {
         reportError('capture_notification', error, 'No se pudo procesar la alerta BDV.');
       }

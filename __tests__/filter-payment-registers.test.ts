@@ -26,6 +26,8 @@ function makeEntry(
     assignedClientId: null,
     assignedClientName: null,
     lastSyncError: null,
+    failureClass: null,
+    failureStage: null,
     createdAt: Date.now(),
     updatedAt: Date.now(),
     ...overrides,
@@ -162,5 +164,13 @@ describe('getPaymentActionHint', () => {
     expect(
       getPaymentActionHint(makeEntry({ syncStatus: 'sync_failed', ref: '', paymentDate: '' }))
     ).toBe('Completar datos →');
+  });
+
+  it('suggests sync and confirm when failed with complete data', () => {
+    expect(
+      getPaymentActionHint(
+        makeEntry({ syncStatus: 'sync_failed', remoteRegisterId: null, ref: '123', paymentDate: '2026-06-01' })
+      )
+    ).toBe('Sincronizar y confirmar →');
   });
 });

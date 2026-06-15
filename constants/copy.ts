@@ -66,6 +66,7 @@ export const copy = {
     actions: {
       confirm: {
         cta: 'Confirmar pago',
+        syncAndConfirmCta: 'Sincronizar y confirmar',
         completedTitle: 'Pago confirmado',
         completedMessage: (summary: string) =>
           `${summary}. La factura quedó marcada como pagada en ${BACKEND_NAME}.`,

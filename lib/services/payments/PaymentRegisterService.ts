@@ -21,21 +21,63 @@ import {
 import { buildDedupeKey } from '@/lib/utils/notification-normalizer';
 import { notificationRecordToParseInput } from '@/lib/utils/notification-text';
 import {
+  cacheEntryToConfirmedCreateInput,
   cacheEntryToCreatePaymentInput,
   cacheEntryToUpdatePaymentInput,
 } from '@/lib/utils/payment-register-to-api';
+import {
+  failureFromApiError,
+  syncFailurePatch,
+  syncSuccessFields,
+} from '@/lib/utils/payment-sync-failure';
 import { BACKEND_NAME } from '@/constants/backend';
 import { getUserErrorMessage } from '@/lib/utils/user-error-message';
 import { useApiConfigStore } from '@/stores/api-config-store';
 import { useApiAuthStore } from '@/stores/api-auth-store';
 import { notificationRepository } from '@/lib/services/notifications/NotificationRepository';
 
+function isSyncableMobile(mobile: string): boolean {
+  const trimmed = mobile.trim();
+  return Boolean(trimmed) && trimmed !== 'sin-leer';
+}
+
 function canSyncToRemote(entry: Pick<PaymentRegisterCacheEntry, 'pago' | 'mobile'>): boolean {
   const pago = Number.parseFloat(entry.pago);
-  return !Number.isNaN(pago) && pago > 0 && Boolean(entry.mobile.trim());
+  return !Number.isNaN(pago) && pago > 0 && isSyncableMobile(entry.mobile);
 }
 
 export class PaymentRegisterService {
+  private async pushConfirmedPaymentToRemote(
+    localId: string,
+    entry: PaymentRegisterCacheEntry
+  ): Promise<PaymentRegisterCacheEntry> {
+    if (entry.remoteRegisterId) {
+      const remoteId = Number.parseInt(entry.remoteRegisterId, 10);
+      if (!Number.isFinite(remoteId)) {
+        throw new Error('Invalid remote payment id');
+      }
+      const remote = await paymentApiService.update(remoteId, cacheEntryToUpdatePaymentInput(entry));
+      return (
+        (await paymentRegisterCacheRepository.updateByLocalId(localId, {
+          invoiceStatus: remote.status === 'confirmado' ? 'paid' : 'pending',
+          syncStatus: 'payment_confirmed',
+          ...syncSuccessFields(),
+        })) ?? entry
+      );
+    }
+
+    const remote = await paymentApiService.create(cacheEntryToConfirmedCreateInput(entry));
+    return (
+      (await paymentRegisterCacheRepository.updateByLocalId(localId, {
+        remoteRegisterId: String(remote.id),
+        remoteInvoiceId: null,
+        invoiceStatus: remote.status === 'confirmado' ? 'paid' : 'pending',
+        syncStatus: 'payment_confirmed',
+        ...syncSuccessFields(),
+      })) ?? entry
+    );
+  }
+
   async ingestFromNotification(record: NotificationRecord): Promise<IngestNotificationResult> {
     const parseInput = notificationRecordToParseInput(record);
 
@@ -65,14 +107,27 @@ export class PaymentRegisterService {
         paymentTime: '',
         notificationKey,
         notificationId: record.id,
-        syncStatus: 'sync_failed',
-        lastSyncError: 'No se pudo leer el texto. Complete manualmente.',
+        ...syncFailurePatch('parse_failed', 'parse', 'No se pudo leer el texto. Complete manualmente.'),
       });
       return { entry, created: true, duplicate: false, parseFailed: true, partialParse: false };
     }
 
     const pago = parsed.pago || '0.00';
     const mobile = parsed.mobile || 'sin-leer';
+
+    const partialFailure =
+      parsed.confidence === 'partial'
+        ? syncFailurePatch(
+            'parse_partial',
+            'parse',
+            'Parse parcial — confirme ref/fecha/hora antes de sincronizar.'
+          )
+        : null;
+    const mobileFailure =
+      !isSyncableMobile(mobile) && parsed.confidence === 'high'
+        ? syncFailurePatch('missing_mobile', 'parse', 'Teléfono no detectado — edite antes de sincronizar.')
+        : null;
+    const ingestFailure = partialFailure ?? mobileFailure;
 
     const entry = await paymentRegisterCacheRepository.upsert({
       name: parsed.name,
@@ -83,11 +138,10 @@ export class PaymentRegisterService {
       paymentTime: parsed.paymentTime,
       notificationKey,
       notificationId: record.id,
-      syncStatus: parsed.confidence === 'high' ? 'pending_sync' : 'sync_failed',
-      lastSyncError:
-        parsed.confidence === 'partial'
-          ? 'Parse parcial — confirme ref/fecha/hora antes de sincronizar.'
-          : null,
+      syncStatus: ingestFailure ? 'sync_failed' : 'pending_sync',
+      lastSyncError: ingestFailure?.lastSyncError ?? null,
+      failureClass: ingestFailure?.failureClass ?? null,
+      failureStage: ingestFailure?.failureStage ?? null,
     });
 
     await this.enqueueCreateRegisterIfNeeded(entry);
@@ -189,23 +243,18 @@ export class PaymentRegisterService {
       return { entry, status: 'already_done' };
     }
 
-    if (entry.remoteRegisterId && useApiAuthStore.getState().isAuthenticated()) {
+    if (useApiAuthStore.getState().isAuthenticated()) {
       try {
-        const remoteId = Number.parseInt(entry.remoteRegisterId, 10);
-        if (!Number.isFinite(remoteId)) {
-          throw new Error('Invalid remote payment id');
-        }
-        await paymentApiService.update(remoteId, cacheEntryToUpdatePaymentInput(entry));
-        const updated = await paymentRegisterCacheRepository.updateByLocalId(localId, {
-          syncStatus: 'payment_confirmed',
-          lastSyncError: null,
-        });
+        const updated = await this.pushConfirmedPaymentToRemote(localId, entry);
         return { entry: updated, status: 'completed' };
       } catch (error) {
         const message = getUserErrorMessage(error, 'action', 'No se pudo confirmar el pago.').message;
         await paymentRegisterCacheRepository.updateByLocalId(localId, {
-          lastSyncError: message,
-          syncStatus: 'sync_failed',
+          ...syncFailurePatch(
+            entry.remoteRegisterId ? failureFromApiError(error) : 'confirm_unsynced',
+            'confirm',
+            message
+          ),
         });
         await paymentSyncQueue.enqueue('confirm_payment', localId);
         throw error;
@@ -213,9 +262,6 @@ export class PaymentRegisterService {
     }
 
     await paymentSyncQueue.enqueue('confirm_payment', localId);
-    if (useApiAuthStore.getState().isAuthenticated()) {
-      void this.processQueue();
-    }
     return { entry, status: 'queued' };
   }
 
@@ -273,7 +319,9 @@ export class PaymentRegisterService {
     let failed = 0;
 
     for (const job of jobs) {
+      let entry: PaymentRegisterCacheEntry | null = null;
       try {
+        entry = await paymentRegisterCacheRepository.getByLocalId(job.localId);
         await this.processJob(job.type, job.localId, job.payload);
         await paymentSyncQueue.removeJob(job.id);
         processed += 1;
@@ -282,7 +330,12 @@ export class PaymentRegisterService {
         const apiError = error instanceof ApiError ? error : null;
         const message = getUserErrorMessage(error, 'action', `No se pudo sincronizar con ${BACKEND_NAME}.`).message;
 
-        reportSyncJobFailure(job.type, job.localId, error);
+        reportSyncJobFailure(job.type, job.localId, error, {
+          failureClass: failureFromApiError(error),
+          failureStage: this.failureStageForJob(job.type),
+          hadRemoteId: Boolean(entry?.remoteRegisterId),
+          retryAttempt: job.attempts + 1,
+        });
 
         if (apiError?.code === 'auth_unauthorized') {
           authEvents.emitUnauthorized();
@@ -291,8 +344,7 @@ export class PaymentRegisterService {
 
         if (apiError?.code === 'auth_forbidden') {
           await paymentRegisterCacheRepository.updateByLocalId(job.localId, {
-            syncStatus: 'sync_failed',
-            lastSyncError: `Permisos insuficientes en ${BACKEND_NAME}.`,
+            ...syncFailurePatch('forbidden', this.failureStageForJob(job.type), `Permisos insuficientes en ${BACKEND_NAME}.`),
           });
           await paymentSyncQueue.removeJob(job.id);
           continue;
@@ -301,7 +353,7 @@ export class PaymentRegisterService {
         if (apiError?.code === 'conflict') {
           await paymentRegisterCacheRepository.updateByLocalId(job.localId, {
             syncStatus: 'synced',
-            lastSyncError: null,
+            ...syncSuccessFields(),
           });
           await paymentSyncQueue.removeJob(job.id);
           continue;
@@ -309,8 +361,7 @@ export class PaymentRegisterService {
 
         if (apiError?.code === 'validation') {
           await paymentRegisterCacheRepository.updateByLocalId(job.localId, {
-            syncStatus: 'sync_failed',
-            lastSyncError: message,
+            ...syncFailurePatch('validation_error', this.failureStageForJob(job.type), message),
           });
           await paymentSyncQueue.removeJob(job.id);
           continue;
@@ -318,8 +369,7 @@ export class PaymentRegisterService {
 
         await paymentSyncQueue.markFailed(job, message);
         await paymentRegisterCacheRepository.updateByLocalId(job.localId, {
-          syncStatus: 'sync_failed',
-          lastSyncError: message,
+          ...syncFailurePatch(failureFromApiError(error), this.failureStageForJob(job.type), message),
         });
       }
     }
@@ -346,25 +396,13 @@ export class PaymentRegisterService {
         remoteInvoiceId: null,
         invoiceStatus: remote.status === 'confirmado' ? 'paid' : 'pending',
         syncStatus: 'synced',
-        lastSyncError: null,
+        ...syncSuccessFields(),
       });
       return;
     }
 
     if (type === 'confirm_payment') {
-      if (!entry.remoteRegisterId) {
-        throw new Error('Payment not synced yet');
-      }
-      const remoteId = Number.parseInt(entry.remoteRegisterId, 10);
-      if (!Number.isFinite(remoteId)) {
-        throw new Error('Invalid remote payment id');
-      }
-      const remote = await paymentApiService.update(remoteId, cacheEntryToUpdatePaymentInput(entry));
-      await paymentRegisterCacheRepository.updateByLocalId(localId, {
-        invoiceStatus: remote.status === 'confirmado' ? 'paid' : 'pending',
-        syncStatus: 'payment_confirmed',
-        lastSyncError: null,
-      });
+      await this.pushConfirmedPaymentToRemote(localId, entry);
       return;
     }
 
@@ -386,6 +424,13 @@ export class PaymentRegisterService {
     if (type === 'pull_registers') {
       await this.pullRemote();
     }
+  }
+
+  private failureStageForJob(type: string): 'create' | 'confirm' | 'pull' | 'enqueue' {
+    if (type === 'confirm_payment') return 'confirm';
+    if (type === 'create_register') return 'create';
+    if (type === 'pull_registers') return 'pull';
+    return 'enqueue';
   }
 
   async list(offset: number, limit: number, filters?: PaymentRegisterListFilters) {

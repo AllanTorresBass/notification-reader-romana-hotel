@@ -85,7 +85,18 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
   async upsert(
     input: Omit<
       PaymentRegisterCacheEntry,
-      'localId' | 'remoteRegisterId' | 'remoteInvoiceId' | 'invoiceStatus' | 'syncStatus' | 'assignedClientId' | 'assignedClientName' | 'lastSyncError' | 'createdAt' | 'updatedAt'
+      | 'localId'
+      | 'remoteRegisterId'
+      | 'remoteInvoiceId'
+      | 'invoiceStatus'
+      | 'syncStatus'
+      | 'assignedClientId'
+      | 'assignedClientName'
+      | 'lastSyncError'
+      | 'failureClass'
+      | 'failureStage'
+      | 'createdAt'
+      | 'updatedAt'
     > & {
       localId?: string;
       remoteRegisterId?: string | null;
@@ -95,6 +106,8 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
       assignedClientId?: string | null;
       assignedClientName?: string | null;
       lastSyncError?: string | null;
+      failureClass?: PaymentRegisterCacheEntry['failureClass'];
+      failureStage?: PaymentRegisterCacheEntry['failureStage'];
     }
   ): Promise<PaymentRegisterCacheEntry> {
     const entries = await this.hydrate();
@@ -118,6 +131,8 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
       assignedClientId: input.assignedClientId ?? existing?.assignedClientId ?? null,
       assignedClientName: input.assignedClientName ?? existing?.assignedClientName ?? null,
       lastSyncError: input.lastSyncError ?? existing?.lastSyncError ?? null,
+      failureClass: input.failureClass ?? existing?.failureClass ?? null,
+      failureStage: input.failureStage ?? existing?.failureStage ?? null,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
@@ -150,6 +165,8 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
         | 'mobile'
         | 'assignedClientId'
         | 'assignedClientName'
+        | 'failureClass'
+        | 'failureStage'
       >
     >
   ): Promise<PaymentRegisterCacheEntry | null> {

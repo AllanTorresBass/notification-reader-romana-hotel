@@ -17,14 +17,14 @@ export function useNotificationShadeSync() {
 
   const syncFromShade = useCallback(async (): Promise<NotificationShadeSyncResult> => {
     if (Platform.OS !== 'android') {
-      return { scanned: 0, ingested: 0, listenerConnected: false };
+      return { scanned: 0, stored: 0, ingested: 0, listenerConnected: false };
     }
     const result = await syncNotificationsFromShade({
       allowedPackages: [...ALLOWED_PACKAGES],
       retentionDays,
       captureRawPayload,
     });
-    if (result.ingested > 0 || result.scanned > 0) {
+    if (result.stored > 0 || result.ingested > 0 || result.scanned > 0) {
       await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.lists() });
       await queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.lists() });
     }

@@ -15,6 +15,7 @@ import { copy } from '@/constants/copy';
 import { fonts, spacing } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { canConfirmPayment } from '@/lib/utils/filter-payment-registers';
+import { resolvePaymentAction } from '@/lib/utils/resolve-payment-action';
 import {
   formatRelativeTime,
   formatSyncStatusLabel,
@@ -53,6 +54,11 @@ export const PaymentDetailSheet = forwardRef<BottomSheet, PaymentDetailSheetProp
 
     const canConfirm = entry ? canConfirmPayment(entry) : false;
     const canAssign = entry ? canAssignClientToPayment(entry) : false;
+    const paymentAction = entry ? resolvePaymentAction(entry) : null;
+    const confirmLabel =
+      paymentAction?.kind === 'sync_and_confirm'
+        ? copy.pagos.actions.confirm.syncAndConfirmCta
+        : copy.pagos.actions.confirm.cta;
     const isConfirmed =
       entry?.syncStatus === 'payment_confirmed' || entry?.syncStatus === 'client_assigned';
 
@@ -189,7 +195,7 @@ export const PaymentDetailSheet = forwardRef<BottomSheet, PaymentDetailSheetProp
                     label={
                       isConfirming
                         ? copy.pagos.actions.confirm.confirming
-                        : copy.pagos.actions.confirm.cta
+                        : confirmLabel
                     }
                     onPress={onConfirmPayment}
                     disabled={isConfirming}

@@ -1,5 +1,20 @@
 import { z } from 'zod';
 
+const paymentFailureClassSchema = z.enum([
+  'parse_failed',
+  'parse_partial',
+  'missing_mobile',
+  'auth_required',
+  'network_error',
+  'validation_error',
+  'forbidden',
+  'confirm_unsynced',
+  'duplicate_key',
+  'unknown',
+]);
+
+const paymentFailureStageSchema = z.enum(['parse', 'enqueue', 'create', 'confirm', 'pull']);
+
 export const syncStatusSchema = z.enum([
   'pending_sync',
   'synced',
@@ -25,6 +40,8 @@ export const paymentRegisterCacheEntrySchema = z.object({
   assignedClientId: z.string().nullable().optional().transform((v) => v ?? null),
   assignedClientName: z.string().nullable().optional().transform((v) => v ?? null),
   lastSyncError: z.string().nullable(),
+  failureClass: paymentFailureClassSchema.nullable().optional().transform((v) => v ?? null),
+  failureStage: paymentFailureStageSchema.nullable().optional().transform((v) => v ?? null),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
