@@ -13,6 +13,27 @@ export class ApiError extends Error {
   }
 }
 
+function formatApiErrorMessage(body: unknown, status: number): string {
+  if (typeof body !== 'object' || !body || !('error' in body)) {
+    return `Request failed (${status})`;
+  }
+
+  const base = String((body as { error: string }).error);
+  const details = (body as { details?: Array<{ message?: string; path?: Array<string | number> }> }).details;
+
+  if (!Array.isArray(details) || details.length === 0) {
+    return base;
+  }
+
+  const first = details.find((issue) => issue.message?.trim());
+  if (!first?.message) {
+    return base;
+  }
+
+  const field = first.path?.length ? first.path.join('.') : undefined;
+  return field ? `${base}: ${field} — ${first.message}` : `${base}: ${first.message}`;
+}
+
 export class BaseApiClient {
   protected getBaseUrl(): string {
     const baseUrl = useApiConfigStore.getState().baseUrl.trim().replace(/\/$/, '');
@@ -75,10 +96,7 @@ export class BaseApiClient {
     }
 
     if (!response.ok) {
-      const message =
-        typeof body === 'object' && body && 'error' in body
-          ? String((body as { error: string }).error)
-          : `Request failed (${response.status})`;
+      const message = formatApiErrorMessage(body, response.status);
 
       if (auth && response.status === 401) {
         useApiAuthStore.getState().clearAuth();

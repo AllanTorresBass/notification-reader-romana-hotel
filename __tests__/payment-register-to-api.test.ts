@@ -22,7 +22,9 @@ const baseEntry: PaymentRegisterCacheEntry = {
   assignedClientId: null,
   assignedClientName: null,
   lastSyncError: null,
-  createdAt: 1_700_000_000_000,
+    failureClass: null,
+    failureStage: null,
+    createdAt: 1_700_000_000_000,
   updatedAt: 1_700_000_000_000,
 };
 
@@ -74,5 +76,18 @@ describe('payment-register-to-api', () => {
     const input = cacheEntryToConfirmedCreateInput(baseEntry);
     expect(input.status).toBe('confirmado');
     expect(input.notificationKey).toBe(baseEntry.notificationKey);
+  });
+
+  it('omits null payerName from API payload', () => {
+    const input = cacheEntryToConfirmedCreateInput({ ...baseEntry, name: null });
+    expect(input.payerName).toBeUndefined();
+    expect(JSON.stringify(input)).not.toContain('null');
+  });
+
+  it('normalizes Venezuelan amount formats for API', () => {
+    expect(
+      cacheEntryToConfirmedCreateInput({ ...baseEntry, pago: '15.000,00' }).amount
+    ).toBe('15000.00');
+    expect(cacheEntryToConfirmedCreateInput({ ...baseEntry, pago: '2,00' }).amount).toBe('2.00');
   });
 });
