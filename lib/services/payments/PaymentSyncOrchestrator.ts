@@ -34,35 +34,77 @@ export interface PaymentSyncResult {
 }
 
 const REMOTE_SYNC_MIN_INTERVAL_MS = 30_000;
+
+const REASON_PRIORITY: Record<PaymentSyncReason, number> = {
+  startup: 0,
+  app_active: 1,
+  notification: 2,
+  login: 3,
+  manual: 4,
+};
+
 let syncInFlight = false;
+let inFlightPromise: Promise<PaymentSyncResult> | null = null;
+let pendingFollowUp: PaymentSyncReason | null = null;
 let lastRemoteSyncAt = 0;
 
+function mergeFollowUpReason(
+  current: PaymentSyncReason | null,
+  next: PaymentSyncReason
+): PaymentSyncReason {
+  if (!current) return next;
+  return REASON_PRIORITY[next] > REASON_PRIORITY[current] ? next : current;
+}
+
 function shouldRunRemoteSync(reason: PaymentSyncReason): boolean {
-  if (reason === 'manual' || reason === 'login') return true;
+  if (reason === 'manual' || reason === 'login' || reason === 'notification') return true;
   return Date.now() - lastRemoteSyncAt >= REMOTE_SYNC_MIN_INTERVAL_MS;
+}
+
+function isUserInitiatedReason(reason: PaymentSyncReason): boolean {
+  return reason === 'manual' || reason === 'login';
 }
 
 export class PaymentSyncOrchestrator {
   async runSync(reason: PaymentSyncReason): Promise<PaymentSyncResult> {
-    const syncRunId = beginSyncRun();
+    if (syncInFlight && inFlightPromise) {
+      pendingFollowUp = mergeFollowUpReason(pendingFollowUp, reason);
+      logger.debug('Payment sync coalesced', { reason, pendingFollowUp });
 
-    if (syncInFlight) {
-      endSyncRun();
-      return {
-        reason,
-        authenticated: useApiAuthStore.getState().isAuthenticated(),
-        created: 0,
-        enqueued: 0,
-        pendingJobs: await paymentSyncQueue.getPendingCount(),
-        pulled: false,
-        durationMs: 0,
-        errorCode: null,
-        errorMessage: null,
-        syncRunId,
-      };
+      if (isUserInitiatedReason(reason)) {
+        const result = await inFlightPromise;
+        const followUp = pendingFollowUp;
+        pendingFollowUp = null;
+        if (followUp) {
+          return this.runSync(followUp);
+        }
+        return result;
+      }
+
+      return inFlightPromise;
     }
 
     syncInFlight = true;
+    inFlightPromise = this.executeSync(reason);
+
+    try {
+      const result = await inFlightPromise;
+      const followUp = pendingFollowUp;
+      pendingFollowUp = null;
+
+      if (followUp) {
+        return this.runSync(followUp);
+      }
+
+      return result;
+    } finally {
+      syncInFlight = false;
+      inFlightPromise = null;
+    }
+  }
+
+  private async executeSync(reason: PaymentSyncReason): Promise<PaymentSyncResult> {
+    const syncRunId = beginSyncRun();
     const startedAt = Date.now();
     let errorCode: SyncErrorCode | null = null;
     let errorMessage: string | null = null;
@@ -92,6 +134,10 @@ export class PaymentSyncOrchestrator {
       }
 
       if (!shouldRunRemoteSync(reason)) {
+        logger.debug('Remote sync skipped by throttle', {
+          reason,
+          elapsedMs: Date.now() - lastRemoteSyncAt,
+        });
         return this.buildResult({
           reason,
           authenticated: true,
@@ -143,7 +189,6 @@ export class PaymentSyncOrchestrator {
       useApiAuthStore.getState().setLastSyncError(errorMessage);
       logger.warn('Payment sync orchestrator failed', { reason, errorCode, errorMessage });
     } finally {
-      syncInFlight = false;
       endSyncRun();
     }
 
@@ -205,6 +250,14 @@ export class PaymentSyncOrchestrator {
 }
 
 export const paymentSyncOrchestrator = new PaymentSyncOrchestrator();
+
+/** @internal Resets module state between tests. */
+export function resetPaymentSyncOrchestratorForTests(): void {
+  syncInFlight = false;
+  inFlightPromise = null;
+  pendingFollowUp = null;
+  lastRemoteSyncAt = 0;
+}
 
 authEvents.onUnauthorized(() => {
   useApiAuthStore.getState().setLastSyncError('Sesión expirada — inicia sesión de nuevo.');

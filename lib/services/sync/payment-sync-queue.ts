@@ -93,6 +93,11 @@ export class PaymentSyncQueue {
     return jobs.length;
   }
 
+  async hasPendingJobForLocalId(localId: string): Promise<boolean> {
+    const jobs = await this.hydrate();
+    return jobs.some((job) => job.localId === localId);
+  }
+
   async clear(): Promise<void> {
     await this.persist([]);
   }

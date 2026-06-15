@@ -1,5 +1,6 @@
 import type { PaymentRegisterCacheEntry } from '@/types/payment/payment-register-cache.types';
 import {
+  cacheEntryToConfirmedCreateInput,
   cacheEntryToCreatePaymentInput,
   cacheEntryToUpdatePaymentInput,
 } from '@/lib/utils/payment-register-to-api';
@@ -59,5 +60,19 @@ describe('payment-register-to-api', () => {
     const input = cacheEntryToUpdatePaymentInput(baseEntry);
     expect(input.status).toBe('confirmado');
     expect(input.reference).toBe('222917745208');
+  });
+
+  it('omits sin-leer phone from API payload', () => {
+    const input = cacheEntryToCreatePaymentInput({
+      ...baseEntry,
+      mobile: 'sin-leer',
+    });
+    expect(input.payerPhone).toBeUndefined();
+  });
+
+  it('builds confirmed create input for unsynced confirm flow', () => {
+    const input = cacheEntryToConfirmedCreateInput(baseEntry);
+    expect(input.status).toBe('confirmado');
+    expect(input.notificationKey).toBe(baseEntry.notificationKey);
   });
 });

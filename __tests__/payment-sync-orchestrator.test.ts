@@ -57,11 +57,12 @@ jest.mock('@/lib/feedback/report-service-error', () => ({
   reportServiceError: jest.fn(),
 }));
 
-import { paymentSyncOrchestrator } from '@/lib/services/payments/PaymentSyncOrchestrator';
+import { paymentSyncOrchestrator, resetPaymentSyncOrchestratorForTests } from '@/lib/services/payments/PaymentSyncOrchestrator';
 
 describe('PaymentSyncOrchestrator', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resetPaymentSyncOrchestratorForTests();
     mockReprocess.mockResolvedValue(2);
     mockSyncPending.mockResolvedValue(1);
     mockProcessQueue.mockResolvedValue(undefined);
@@ -103,5 +104,39 @@ describe('PaymentSyncOrchestrator', () => {
 
     expect(result.errorMessage).toBeTruthy();
     expect(mockPullRemote).not.toHaveBeenCalled();
+  });
+
+  it('runs remote sync for notification reason without throttle', async () => {
+    mockIsAuthenticated.mockReturnValue(true);
+
+    await paymentSyncOrchestrator.runSync('startup');
+    jest.clearAllMocks();
+    mockReprocess.mockResolvedValue(0);
+    mockSyncPending.mockResolvedValue(0);
+    mockGetPendingCount.mockResolvedValue(0);
+
+    const result = await paymentSyncOrchestrator.runSync('notification');
+
+    expect(result.pulled).toBe(true);
+    expect(mockPullRemote).toHaveBeenCalled();
+  });
+
+  it('waits for in-flight sync when manual refresh is requested', async () => {
+    mockIsAuthenticated.mockReturnValue(true);
+    let resolveFirst!: (value: unknown) => void;
+    const firstPull = new Promise<void>((resolve) => {
+      resolveFirst = resolve;
+    });
+    mockPullRemote.mockImplementationOnce(() => firstPull);
+
+    const first = paymentSyncOrchestrator.runSync('startup');
+    const second = paymentSyncOrchestrator.runSync('manual');
+
+    resolveFirst(undefined);
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+
+    expect(firstResult.pulled).toBe(true);
+    expect(secondResult.pulled).toBe(true);
+    expect(mockPullRemote).toHaveBeenCalledTimes(2);
   });
 });

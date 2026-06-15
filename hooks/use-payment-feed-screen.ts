@@ -31,7 +31,8 @@ import { reportOutcome, reportError, reportOutcomeWithPolicy } from '@/lib/feedb
 import { queryKeys } from '@/lib/query-keys';
 import { paymentSyncOrchestrator } from '@/lib/services/payments/PaymentSyncOrchestrator';
 import { normalizePagoAmount } from '@/lib/utils/bdv-pagomovil-parser';
-import { getPaymentActionHint } from '@/lib/utils/filter-payment-registers';
+import { getPaymentActionHint, getPaymentActionKind, resolvePaymentAction } from '@/lib/utils/filter-payment-registers';
+import { paymentSyncQueue } from '@/lib/services/sync/payment-sync-queue';
 import {
   flattenPaymentSections,
   groupPaymentRegistersByDate,
@@ -243,14 +244,23 @@ export function usePaymentFeedScreen() {
       setAssigningClientId(null);
       setSelected(entry);
       cardOpenTimeRef.current = Date.now();
-      uxLogger.event('payment_card_open', {
-        syncStatus: entry.syncStatus,
-        filterActive: statusFilter !== 'all' || Boolean(debouncedSearch.trim()),
-        hadActionHint: Boolean(getPaymentActionHint(entry)),
+      const action = resolvePaymentAction(entry, { isAuthenticated });
+      void paymentSyncQueue.hasPendingJobForLocalId(entry.localId).then((queuePendingForEntry) => {
+        uxLogger.event('payment_card_open', {
+          syncStatus: entry.syncStatus,
+          failureClass: entry.failureClass ?? undefined,
+          failureStage: entry.failureStage ?? undefined,
+          hadRemoteId: Boolean(entry.remoteRegisterId),
+          hadActionHint: Boolean(action.hint),
+          actionHintKind: getPaymentActionKind(entry, { isAuthenticated }),
+          filterActive: statusFilter !== 'all' || Boolean(debouncedSearch.trim()),
+          activeFilter: statusFilter,
+          queuePendingForEntry,
+        });
       });
       detailRef.current?.expand();
     },
-    [statusFilter, debouncedSearch]
+    [statusFilter, debouncedSearch, isAuthenticated]
   );
 
   const resetAssignSheetDraft = useCallback(() => {

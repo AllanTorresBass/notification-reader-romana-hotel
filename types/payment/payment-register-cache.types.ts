@@ -1,3 +1,5 @@
+import type { PaymentFailureClass, PaymentFailureStage } from '@/types/payment/payment-sync-failure.types';
+
 export type SyncStatus =
   | 'pending_sync'
   | 'synced'
@@ -24,9 +26,13 @@ export interface PaymentRegisterCacheEntry {
   assignedClientId: string | null;
   assignedClientName: string | null;
   lastSyncError: string | null;
+  failureClass: PaymentFailureClass | null;
+  failureStage: PaymentFailureStage | null;
   createdAt: number;
   updatedAt: number;
 }
+
+export type { PaymentFailureClass, PaymentFailureStage, PaymentActionKind } from '@/types/payment/payment-sync-failure.types';
 
 export type PaymentStatusFilter =
   | 'all'

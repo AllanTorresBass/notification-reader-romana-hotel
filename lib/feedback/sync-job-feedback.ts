@@ -4,7 +4,19 @@ import { reportOutcome } from '@/lib/feedback/report-feedback';
 import { withSyncRunMeta } from '@/lib/feedback/sync-run-context';
 import { getUserErrorMessage } from '@/lib/utils/user-error-message';
 
-const pendingJobs: Array<{ jobType: string; localId: string; message: string }> = [];
+interface PendingSyncJobReport {
+  jobType: string;
+  localId: string;
+  message: string;
+  meta?: {
+    failureClass?: string;
+    failureStage?: string;
+    hadRemoteId?: boolean;
+    retryAttempt?: number;
+  };
+}
+
+const pendingJobs: PendingSyncJobReport[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
 function flushPendingSyncJobReports(): void {
@@ -16,8 +28,17 @@ function flushPendingSyncJobReports(): void {
 
   if (jobs.length === 1) {
     const job = jobs[0];
+    const outcome = formatSyncJobFailedOutcome(job.message, job.jobType);
     reportOutcome(
-      formatSyncJobFailedOutcome(job.message, job.jobType),
+      {
+        ...outcome,
+        meta: withSyncRunMeta({
+          ...outcome.meta,
+          entityId: job.localId,
+          jobType: job.jobType,
+          ...job.meta,
+        }),
+      },
       { toast: false, log: true, sync: true }
     );
     return;
@@ -34,6 +55,7 @@ function flushPendingSyncJobReports(): void {
         failedCount: jobs.length,
         jobType: first.jobType,
         entityId: first.localId,
+        ...first.meta,
       }),
     },
     { toast: false, log: true, sync: true }
@@ -44,10 +66,11 @@ export function reportSyncJobFailure(
   jobType: string,
   localId: string,
   error: unknown,
+  meta?: PendingSyncJobReport['meta'],
   fallback = `No se pudo sincronizar con ${BACKEND_NAME}.`
 ): void {
   const { message } = getUserErrorMessage(error, 'action', fallback);
-  pendingJobs.push({ jobType, localId, message });
+  pendingJobs.push({ jobType, localId, message, meta });
 
   if (flushTimer) clearTimeout(flushTimer);
   flushTimer = setTimeout(flushPendingSyncJobReports, 500);

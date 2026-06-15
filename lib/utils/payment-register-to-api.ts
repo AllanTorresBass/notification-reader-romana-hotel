@@ -31,7 +31,7 @@ export function cacheEntryToCreatePaymentInput(
     reference: resolveReference(entry),
     amount: entry.pago,
     payerName: entry.name,
-    payerPhone: entry.mobile,
+    payerPhone: isSyncableMobile(entry.mobile) ? entry.mobile : undefined,
     bank: BANCO_DE_VENEZUELA_LABEL,
     status: resolveStatus(entry),
     paymentDate: resolvePaymentDate(entry),
@@ -48,7 +48,7 @@ export function cacheEntryToUpdatePaymentInput(
     reference: resolveReference(entry),
     amount: entry.pago,
     payerName: entry.name,
-    payerPhone: entry.mobile,
+    payerPhone: isSyncableMobile(entry.mobile) ? entry.mobile : undefined,
     bank: BANCO_DE_VENEZUELA_LABEL,
     status: 'confirmado',
     paymentDate: resolvePaymentDate(entry),
@@ -56,4 +56,28 @@ export function cacheEntryToUpdatePaymentInput(
     notificationKey: entry.notificationKey,
     source: 'mobile',
   };
+}
+
+/** Create payload when confirming a payment that was never synced to the server. */
+export function cacheEntryToConfirmedCreateInput(
+  entry: PaymentRegisterCacheEntry
+): CreatePaymentInput {
+  const update = cacheEntryToUpdatePaymentInput(entry);
+  return {
+    reference: update.reference,
+    amount: update.amount,
+    payerName: update.payerName,
+    payerPhone: update.payerPhone,
+    bank: update.bank,
+    status: 'confirmado',
+    paymentDate: update.paymentDate,
+    paymentTime: update.paymentTime,
+    notificationKey: entry.notificationKey,
+    source: 'mobile',
+  };
+}
+
+function isSyncableMobile(mobile: string): boolean {
+  const trimmed = mobile.trim();
+  return Boolean(trimmed) && trimmed !== 'sin-leer';
 }

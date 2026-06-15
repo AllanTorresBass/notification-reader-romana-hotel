@@ -10,8 +10,13 @@ export function canConfirmPayment(entry: PaymentRegisterCacheEntry): boolean {
   if (entry.syncStatus === 'payment_confirmed' || entry.syncStatus === 'client_assigned') {
     return false;
   }
-  return Boolean(entry.ref && entry.paymentDate);
+  const trimmedMobile = entry.mobile.trim();
+  const mobileOk = Boolean(trimmedMobile) && trimmedMobile !== 'sin-leer';
+  return Boolean(entry.ref && entry.paymentDate && mobileOk);
 }
+
+export { getPaymentActionHint, getPaymentActionKind, resolvePaymentAction } from '@/lib/utils/resolve-payment-action';
+export type { ResolvePaymentActionOptions } from '@/lib/utils/resolve-payment-action';
 
 function matchesStatusFilter(
   entry: PaymentRegisterCacheEntry,
@@ -81,23 +86,4 @@ export function getPaymentFilterCounts(
     awaiting_assign: entries.filter((e) => matchesStatusFilter(e, 'awaiting_assign')).length,
     completed: entries.filter((e) => matchesStatusFilter(e, 'completed')).length,
   };
-}
-
-export function getPaymentActionHint(entry: PaymentRegisterCacheEntry): string | null {
-  if (entry.syncStatus === 'sync_failed') {
-    if (!entry.ref || !entry.paymentDate) {
-      return 'Completar datos →';
-    }
-    return 'Reintentar sync →';
-  }
-  if (canConfirmPayment(entry)) {
-    return 'Confirmar pago →';
-  }
-  if (canAssignClientToPayment(entry) && !entry.assignedClientId) {
-    return 'Asociar cliente →';
-  }
-  if (entry.syncStatus === 'pending_sync') {
-    return 'Pendiente de sync';
-  }
-  return null;
 }
