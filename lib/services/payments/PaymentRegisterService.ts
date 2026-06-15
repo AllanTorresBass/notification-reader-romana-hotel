@@ -7,7 +7,7 @@ import type {
   PaymentActionResult,
   QueueProcessResult,
 } from '@/types/payment/payment-action-result.types';
-import { paymentRegisterApiService } from '@/lib/api-client/payment-registers/PaymentRegisterApiService';
+import { paymentApiService } from '@/lib/api-client/payments/PaymentApiService';
 import { ApiError } from '@/lib/api-client/base/BaseApiClient';
 import { authEvents } from '@/lib/auth/auth-events';
 import { reportSyncJobFailure } from '@/lib/feedback/sync-job-feedback';
@@ -20,6 +20,10 @@ import {
 } from '@/lib/utils/bdv-pagomovil-parser';
 import { buildDedupeKey } from '@/lib/utils/notification-normalizer';
 import { notificationRecordToParseInput } from '@/lib/utils/notification-text';
+import {
+  cacheEntryToCreatePaymentInput,
+  cacheEntryToUpdatePaymentInput,
+} from '@/lib/utils/payment-register-to-api';
 import { BACKEND_NAME } from '@/constants/backend';
 import { getUserErrorMessage } from '@/lib/utils/user-error-message';
 import { useApiConfigStore } from '@/stores/api-config-store';
@@ -120,7 +124,7 @@ export class PaymentRegisterService {
     return created;
   }
 
-  /** Enqueue local cache entries that are not yet in kd-gym payment_registers. */
+  /** Enqueue local cache entries that are not yet in La Romana payment_registers. */
   async syncPendingRegisters(): Promise<number> {
     const { items } = await paymentRegisterCacheRepository.listSlice(0, 500);
     let enqueued = 0;
@@ -187,13 +191,12 @@ export class PaymentRegisterService {
 
     if (entry.remoteRegisterId && useApiAuthStore.getState().isAuthenticated()) {
       try {
-        const remote = await paymentRegisterApiService.confirmPayment(entry.remoteRegisterId, {
-          reference: entry.ref,
-          paymentDate: entry.paymentDate,
-          paymentTime: entry.paymentTime,
-        });
+        const remoteId = Number.parseInt(entry.remoteRegisterId, 10);
+        if (!Number.isFinite(remoteId)) {
+          throw new Error('Invalid remote payment id');
+        }
+        await paymentApiService.update(remoteId, cacheEntryToUpdatePaymentInput(entry));
         const updated = await paymentRegisterCacheRepository.updateByLocalId(localId, {
-          invoiceStatus: remote.invoiceStatus,
           syncStatus: 'payment_confirmed',
           lastSyncError: null,
         });
@@ -233,52 +236,28 @@ export class PaymentRegisterService {
       assignedClientName: clientName?.trim() || null,
     };
 
-    if (!entry.remoteRegisterId) {
-      await paymentSyncQueue.enqueue('assign_client', localId, {
-        clientId,
-        clientName: clientPatch.assignedClientName,
-      });
-      if (useApiAuthStore.getState().isAuthenticated()) {
-        void this.processQueue();
-      }
-      return { entry, status: 'queued' };
-    }
-
-    try {
-      await paymentRegisterApiService.assignClient(entry.remoteRegisterId, clientId);
-      const updated = await paymentRegisterCacheRepository.updateByLocalId(localId, {
-        ...clientPatch,
-        syncStatus: 'client_assigned',
-        lastSyncError: null,
-      });
-      return { entry: updated, status: 'completed' };
-    } catch (error) {
-      const message = getUserErrorMessage(error, 'action', 'No se pudo asociar el cliente.').message;
-      await paymentRegisterCacheRepository.updateByLocalId(localId, {
-        lastSyncError: message,
-        syncStatus: 'sync_failed',
-      });
-      await paymentSyncQueue.enqueue('assign_client', localId, {
-        clientId,
-        clientName: clientPatch.assignedClientName,
-      });
-      throw error;
-    }
+    await paymentRegisterCacheRepository.updateByLocalId(localId, {
+      ...clientPatch,
+      syncStatus: 'client_assigned',
+      lastSyncError: null,
+    });
+    const updated = await paymentRegisterCacheRepository.getByLocalId(localId);
+    return { entry: updated, status: 'completed' };
   }
 
   async pullRemote(): Promise<void> {
     if (!useApiAuthStore.getState().isAuthenticated()) return;
 
-    const response = await paymentRegisterApiService.list(1, 100);
+    const payments = await paymentApiService.list();
     await paymentRegisterCacheRepository.mergeRemoteEntries(
-      response.data.map((r) => ({
-        id: r.id,
-        name: r.name,
-        pago: r.pago,
-        mobile: r.mobile,
-        invoiceId: r.invoiceId,
-        invoiceStatus: r.invoiceStatus,
-        notificationKey: r.notificationKey,
+      payments.map((payment) => ({
+        id: String(payment.id),
+        name: payment.payerName,
+        pago: payment.amount,
+        mobile: payment.payerPhone ?? '',
+        invoiceId: null,
+        invoiceStatus: payment.status === 'confirmado' ? 'paid' : 'pending',
+        notificationKey: payment.notificationKey,
       }))
     );
     useApiConfigStore.getState().setLastSyncAt(Date.now());
@@ -319,7 +298,16 @@ export class PaymentRegisterService {
           continue;
         }
 
-        if (apiError?.code === 'conflict' || apiError?.code === 'validation') {
+        if (apiError?.code === 'conflict') {
+          await paymentRegisterCacheRepository.updateByLocalId(job.localId, {
+            syncStatus: 'synced',
+            lastSyncError: null,
+          });
+          await paymentSyncQueue.removeJob(job.id);
+          continue;
+        }
+
+        if (apiError?.code === 'validation') {
           await paymentRegisterCacheRepository.updateByLocalId(job.localId, {
             syncStatus: 'sync_failed',
             lastSyncError: message,
@@ -352,16 +340,11 @@ export class PaymentRegisterService {
     if (!entry) return;
 
     if (type === 'create_register') {
-      const result = await paymentRegisterApiService.create({
-        name: entry.name,
-        pago: entry.pago,
-        mobile: entry.mobile,
-        notificationKey: entry.notificationKey,
-      });
+      const remote = await paymentApiService.create(cacheEntryToCreatePaymentInput(entry));
       await paymentRegisterCacheRepository.updateByLocalId(localId, {
-        remoteRegisterId: result.register.id,
-        remoteInvoiceId: result.invoiceId,
-        invoiceStatus: result.register.invoiceStatus,
+        remoteRegisterId: String(remote.id),
+        remoteInvoiceId: null,
+        invoiceStatus: remote.status === 'confirmado' ? 'paid' : 'pending',
         syncStatus: 'synced',
         lastSyncError: null,
       });
@@ -370,15 +353,15 @@ export class PaymentRegisterService {
 
     if (type === 'confirm_payment') {
       if (!entry.remoteRegisterId) {
-        throw new Error('Register not synced yet');
+        throw new Error('Payment not synced yet');
       }
-      const remote = await paymentRegisterApiService.confirmPayment(entry.remoteRegisterId, {
-        reference: entry.ref,
-        paymentDate: entry.paymentDate,
-        paymentTime: entry.paymentTime,
-      });
+      const remoteId = Number.parseInt(entry.remoteRegisterId, 10);
+      if (!Number.isFinite(remoteId)) {
+        throw new Error('Invalid remote payment id');
+      }
+      const remote = await paymentApiService.update(remoteId, cacheEntryToUpdatePaymentInput(entry));
       await paymentRegisterCacheRepository.updateByLocalId(localId, {
-        invoiceStatus: remote.invoiceStatus,
+        invoiceStatus: remote.status === 'confirmado' ? 'paid' : 'pending',
         syncStatus: 'payment_confirmed',
         lastSyncError: null,
       });
@@ -388,10 +371,9 @@ export class PaymentRegisterService {
     if (type === 'assign_client') {
       const clientId = payload?.clientId as string | undefined;
       const clientName = payload?.clientName as string | null | undefined;
-      if (!clientId || !entry.remoteRegisterId) {
-        throw new Error('Missing client or register');
+      if (!clientId) {
+        throw new Error('Missing client');
       }
-      await paymentRegisterApiService.assignClient(entry.remoteRegisterId, clientId);
       await paymentRegisterCacheRepository.updateByLocalId(localId, {
         assignedClientId: clientId,
         assignedClientName: clientName ?? null,

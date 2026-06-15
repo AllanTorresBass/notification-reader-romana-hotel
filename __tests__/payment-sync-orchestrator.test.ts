@@ -49,7 +49,7 @@ jest.mock('@/stores/api-auth-store', () => ({
 
 jest.mock('@/stores/api-config-store', () => ({
   useApiConfigStore: {
-    getState: () => ({ baseUrl: 'https://www.kd-gym.com', setLastSyncAt: jest.fn() }),
+    getState: () => ({ baseUrl: 'https://la-romana-hotel.vercel.app', setLastSyncAt: jest.fn() }),
   },
 }));
 

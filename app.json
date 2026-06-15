@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "KD-Gym Pagos",
+    "name": "La Romana — Pago Móvil",
     "slug": "notification-reader",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -15,7 +15,7 @@
     "android": {
       "package": "com.notificationreader.app",
       "adaptiveIcon": {
-        "backgroundColor": "#05080B",
+        "backgroundColor": "#1A1814",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -34,9 +34,9 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/kd-gym-logo.png",
+          "image": "./assets/images/la-romana-logo.png",
           "resizeMode": "contain",
-          "backgroundColor": "#05080B"
+          "backgroundColor": "#1A1814"
         }
       ]
     ],

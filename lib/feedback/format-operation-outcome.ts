@@ -6,6 +6,7 @@ import {
   formatConfirmPaymentMessages,
 } from '@/lib/feedback/payment-action-messages';
 import { classifyError } from '@/lib/errors/classify-error';
+import { ApiError } from '@/lib/api-client/base/BaseApiClient';
 import { withSyncRunMeta } from '@/lib/feedback/sync-run-context';
 import { getUserErrorMessage } from '@/lib/utils/user-error-message';
 import { formatPagoDisplay } from '@/lib/utils/format-pago';
@@ -300,6 +301,8 @@ export function formatErrorOutcome(
       errorCode: classified.errorCode,
       category: classified.category,
       recoverable: classified.recoverable,
+      errorMessage: classified.message.slice(0, 160),
+      ...(error instanceof ApiError ? { httpStatus: error.status } : {}),
     }),
   });
 }

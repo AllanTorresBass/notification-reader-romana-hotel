@@ -1,6 +1,6 @@
 import type { OperationKind, OperationOutcome, OperationStatus } from '@/types/feedback/operation-outcome.types';
 
-/** Payload sent to kd-gym POST /api/v1/activity-logs */
+/** Payload sent to La Romana POST /api/v1/activity-logs */
 export interface CreateActivityLogRequest {
   clientEventId: string;
   kind: OperationKind;
@@ -11,7 +11,7 @@ export interface CreateActivityLogRequest {
   occurredAt: string;
 }
 
-/** Row returned from kd-gym GET /api/v1/activity-logs */
+/** Row returned from La Romana GET /api/v1/activity-logs */
 export interface RemoteActivityLogEntry {
   id: string;
   clientEventId: string | null;

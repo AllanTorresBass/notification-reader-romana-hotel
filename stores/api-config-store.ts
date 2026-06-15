@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { LA_ROMANA_DEFAULT_API_URL } from '@/constants/api-defaults';
+import { LA_ROMANA_DEFAULT_API_URL, normalizeApiBaseUrl } from '@/constants/api-defaults';
 import { STORAGE_KEYS } from '@/constants/storage-keys';
 import { createZustandSecureStorage } from '@/lib/storage/zustand-secure-storage';
 
@@ -20,7 +20,7 @@ export const useApiConfigStore = create<ApiConfigState>()(
       baseUrl: LA_ROMANA_DEFAULT_API_URL,
       defaultServiceId: null,
       lastSyncAt: null,
-      setBaseUrl: (baseUrl) => set({ baseUrl: baseUrl.replace(/\/$/, '') }),
+      setBaseUrl: (baseUrl) => set({ baseUrl: normalizeApiBaseUrl(baseUrl) }),
       setDefaultServiceId: (defaultServiceId) => set({ defaultServiceId }),
       setLastSyncAt: (lastSyncAt) => set({ lastSyncAt }),
     }),
