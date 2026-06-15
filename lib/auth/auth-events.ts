@@ -23,6 +23,7 @@ export type SyncErrorCode =
   | 'unknown';
 
 export function classifyApiError(status: number): SyncErrorCode {
+  if (status === 0) return 'network';
   if (status === 401) return 'auth_unauthorized';
   if (status === 403) return 'auth_forbidden';
   if (status === 409) return 'conflict';

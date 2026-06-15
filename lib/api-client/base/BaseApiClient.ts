@@ -1,12 +1,12 @@
 import { useApiAuthStore } from '@/stores/api-auth-store';
 import { useApiConfigStore } from '@/stores/api-config-store';
-import { authEvents, classifyApiError } from '@/lib/auth/auth-events';
+import { authEvents, classifyApiError, type SyncErrorCode } from '@/lib/auth/auth-events';
 
 export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public code = classifyApiError(status)
+    public code: SyncErrorCode = classifyApiError(status)
   ) {
     super(message);
     this.name = 'ApiError';
@@ -41,6 +41,7 @@ export class BaseApiClient {
     const url = `${this.getBaseUrl()}${path}`;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      Accept: 'application/json',
       ...(init.headers as Record<string, string>),
     };
 
@@ -48,7 +49,23 @@ export class BaseApiClient {
       Object.assign(headers, this.getAuthHeaders());
     }
 
-    const response = await fetch(url, { ...init, headers });
+    let response: Response;
+    try {
+      response = await fetch(url, { ...init, headers, redirect: 'manual' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ApiError(message, 0, 'network');
+    }
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location') ?? 'unknown';
+      throw new ApiError(
+        `El servidor redirigió la petición a ${location}. Verifica la URL de ${path}.`,
+        response.status,
+        'validation'
+      );
+    }
+
     const text = await response.text();
     let body: unknown = null;
     if (text) {

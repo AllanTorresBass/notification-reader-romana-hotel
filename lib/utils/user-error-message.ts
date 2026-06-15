@@ -88,6 +88,13 @@ export function getUserErrorMessage(
       return { title, message: CODE_MESSAGES.network };
     }
 
+    if (error.status === 401) {
+      const apiMessage = error.message.trim();
+      if (apiMessage && !isTechnicalMessage(apiMessage) && apiMessage !== 'Not authenticated') {
+        return { title, message: apiMessage };
+      }
+    }
+
     if (error.code === 'validation' || error.code === 'conflict') {
       const apiMessage = error.message.trim();
       if (apiMessage && !isTechnicalMessage(apiMessage)) {
