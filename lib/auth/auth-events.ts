@@ -28,6 +28,5 @@ export function classifyApiError(status: number): SyncErrorCode {
   if (status === 403) return 'auth_forbidden';
   if (status === 409) return 'conflict';
   if (status >= 400 && status < 500) return 'validation';
-  if (status >= 500) return 'network';
   return 'unknown';
 }

@@ -137,6 +137,41 @@ export async function verifyAuthApi(baseUrl = LA_ROMANA_DEFAULT_API_URL): Promis
     });
   }
 
+  const protectedRoutes = ['/api/v1/payments'];
+
+  for (const path of protectedRoutes) {
+    const routeName = path.split('?')[0]?.replace('/api/v1/', '') ?? path;
+    try {
+      const res = await fetch(joinUrl(normalizedBase, path), {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        redirect: 'manual',
+      });
+      const body = await readResponseBody(res);
+      const apiError =
+        body.json && typeof body.json === 'object' && 'error' in body.json
+          ? String((body.json as { error: string }).error)
+          : null;
+
+      checks.push({
+        name: routeName,
+        ok: res.status === 401,
+        status: res.status,
+        detail:
+          res.status === 401
+            ? apiError ?? 'Protected route returns 401 without token (expected).'
+            : apiError ?? (body.text.slice(0, 120) || `Unexpected status ${res.status}`),
+      });
+    } catch (error) {
+      checks.push({
+        name: routeName,
+        ok: false,
+        status: null,
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   return {
     baseUrl: normalizedBase,
     ok: checks.every((check) => check.ok),

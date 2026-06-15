@@ -15,7 +15,7 @@ export class ApiError extends Error {
 
 export class BaseApiClient {
   protected getBaseUrl(): string {
-    const baseUrl = useApiConfigStore.getState().baseUrl.trim();
+    const baseUrl = useApiConfigStore.getState().baseUrl.trim().replace(/\/$/, '');
     if (!baseUrl) {
       throw new ApiError('API base URL not configured', 0);
     }
@@ -29,7 +29,6 @@ export class BaseApiClient {
     }
     return {
       Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
     };
   }
 
@@ -51,18 +50,17 @@ export class BaseApiClient {
 
     let response: Response;
     try {
-      response = await fetch(url, { ...init, headers, redirect: 'manual' });
+      response = await fetch(url, { ...init, headers });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ApiError(message, 0, 'network');
     }
 
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('location') ?? 'unknown';
+    if (response.redirected && response.url.includes('/sign-in')) {
       throw new ApiError(
-        `El servidor redirigió la petición a ${location}. Verifica la URL de ${path}.`,
-        response.status,
-        'validation'
+        'El servidor redirigió al portal web. Verifica la URL de La Romana en Ajustes.',
+        401,
+        'auth_unauthorized'
       );
     }
 

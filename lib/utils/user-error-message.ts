@@ -1,6 +1,6 @@
 import type { SyncErrorCode } from '@/lib/auth/auth-events';
 import { ApiError } from '@/lib/api-client/base/BaseApiClient';
-import { BACKEND_NAME } from '@/constants/backend';
+import { BACKEND_NAME, LA_ROMANA_DEFAULT_API_URL } from '@/constants/backend';
 
 export type UserErrorContext = 'fetch' | 'action';
 
@@ -19,7 +19,7 @@ const CODE_MESSAGES: Record<SyncErrorCode, string> = {
   auth_forbidden: `No tienes permiso para hacer esto en ${BACKEND_NAME}.`,
   conflict: 'Este registro ya fue procesado o modificado en el servidor.',
   validation: 'Revisa los datos e intenta de nuevo.',
-  network: `No hay conexión con ${BACKEND_NAME}. Verifica tu internet e intenta otra vez.`,
+  network: `No hay conexión con ${BACKEND_NAME}. Verifica internet en el teléfono y que la URL sea ${LA_ROMANA_DEFAULT_API_URL}`,
   unknown: 'Ocurrió un error inesperado. Intenta de nuevo en un momento.',
 };
 
@@ -93,6 +93,17 @@ export function getUserErrorMessage(
       if (apiMessage && !isTechnicalMessage(apiMessage) && apiMessage !== 'Not authenticated') {
         return { title, message: apiMessage };
       }
+    }
+
+    if (error.status >= 500) {
+      const apiMessage = error.message.trim();
+      if (apiMessage && !isTechnicalMessage(apiMessage)) {
+        return { title, message: apiMessage };
+      }
+      return {
+        title,
+        message: `${BACKEND_NAME} respondió con un error interno (${error.status}). Intenta de nuevo o contacta al administrador.`,
+      };
     }
 
     if (error.code === 'validation' || error.code === 'conflict') {

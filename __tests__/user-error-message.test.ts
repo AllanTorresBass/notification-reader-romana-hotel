@@ -28,7 +28,15 @@ describe('getUserErrorMessage', () => {
   it('hides technical request failure strings', () => {
     const result = getUserErrorMessage(new ApiError('Request failed (500)', 500), 'fetch');
     expect(result.message).not.toContain('Request failed');
-    expect(result.message).toContain('conexión');
+    expect(result.message).toContain('error interno');
+  });
+
+  it('shows readable server error messages for HTTP 500', () => {
+    const result = getUserErrorMessage(
+      new ApiError('Error interno del servidor', 500),
+      'action'
+    );
+    expect(result.message).toBe('Error interno del servidor');
   });
 
   it('uses context-specific fallbacks', () => {
