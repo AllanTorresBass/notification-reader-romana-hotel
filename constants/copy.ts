@@ -5,7 +5,6 @@ import { countLabel } from '@/constants/feedback-copy-helpers';
 export const copy = {
   tabs: {
     pagos: 'Pagos',
-    facturas: 'Facturas',
     bdv: 'BDV',
     ajustes: 'Ajustes',
   },
@@ -32,7 +31,6 @@ export const copy = {
       needsAction: 'Acción',
       pendingSync: 'Pendiente',
       syncFailed: 'Error',
-      awaitingAssign: 'Sin cliente',
       completed: 'Completados',
       resultCount: (filtered: number, total: number) =>
         filtered === total
@@ -47,13 +45,11 @@ export const copy = {
       selectPayment: 'Selecciona un pago',
       emitterPhone: 'Tel. emisor',
       paymentData: 'Datos del pago',
-      clientData: `Cliente ${BACKEND_NAME}`,
       reference: 'Referencia',
       date: 'Fecha',
       time: 'Hora',
       name: 'Nombre',
       noName: 'Sin nombre',
-      assignedClient: `Cliente ${BACKEND_NAME}`,
       missingFieldsTitle: 'Datos incompletos',
       missingFieldsMessage: (fields: string) =>
         `Faltan ${fields} para confirmar el pago. Completa el registro manual.`,
@@ -62,15 +58,14 @@ export const copy = {
     },
     manualRegisterHeader: 'Registro manual',
     cancelManual: 'Cancelar',
-    assignBack: 'Volver al pago',
     actions: {
       confirm: {
         cta: 'Confirmar pago',
         syncAndConfirmCta: 'Sincronizar y confirmar',
         completedTitle: 'Pago confirmado',
         completedMessage: (summary: string) =>
-          `${summary}. La factura quedó marcada como pagada en ${BACKEND_NAME}.`,
-        completedMessageGeneric: `La factura quedó marcada como pagada en ${BACKEND_NAME}.`,
+          `${summary}. El pago quedó registrado en ${BACKEND_NAME}.`,
+        completedMessageGeneric: `El pago quedó registrado en ${BACKEND_NAME}.`,
         queuedTitle: 'Confirmación pendiente',
         queuedMessage: (summary: string) =>
           `${summary}. Se aplicará en ${BACKEND_NAME} en cuanto vuelva la conexión.`,
@@ -80,132 +75,8 @@ export const copy = {
         alreadyMessage: (summary: string) =>
           `${summary}. Este registro ya había sido confirmado.`,
         alreadyMessageGeneric: 'Este pago ya había sido confirmado.',
-        nextStep: `Siguiente paso: asocia el cliente de ${BACKEND_NAME} a este pago.`,
         confirming: 'Confirmando pago…',
       },
-      assign: {
-        completedTitle: 'Cliente asociado',
-        completedMessage: (client: string, summary: string) =>
-          summary
-            ? `${client} quedó vinculado al pago de ${summary}.`
-            : `${client} quedó vinculado en ${BACKEND_NAME}.`,
-        queuedTitle: 'Asociación pendiente',
-        queuedMessage: (client: string, summary: string) =>
-          summary
-            ? `${client} se vinculará al pago de ${summary} al sincronizar.`
-            : `${client} se vinculará en ${BACKEND_NAME} al sincronizar el pago.`,
-        alreadyTitle: 'Cliente ya asociado',
-        alreadyMessage: (client: string, summary: string) =>
-          summary
-            ? `El pago de ${summary} ya tenía un cliente vinculado.`
-            : 'Este pago ya tenía un cliente vinculado.',
-        clientFallback: 'El cliente',
-        assigning: 'Asociando cliente…',
-        assignCta: 'Asociar cliente',
-      },
-    },
-  },
-  facturas: {
-    title: 'Facturas',
-    subtitle: 'Crear y consultar facturas',
-    loading: 'Cargando facturas…',
-    emptyTitle: 'Sin facturas',
-    emptyDescription: 'Crea la primera factura para un cliente en mostrador.',
-    newInvoice: 'Nueva factura',
-    connectPrompt: `Conecta ${BACKEND_NAME} en Ajustes para crear facturas.`,
-    unauthorizedCreate: 'Tu rol no permite crear facturas. Contacta a un administrador.',
-    goToSettings: 'Ir a Ajustes',
-    listLoadError: 'No se pudieron cargar las facturas.',
-    detailLoadError: 'No se pudo cargar la factura.',
-    createError: 'No se pudo crear la factura. Intenta de nuevo.',
-    successTitle: 'Factura creada',
-    successMessage: (number: string) => `Factura ${number} creada y pagada en ${BACKEND_NAME}.`,
-    createAnother: 'Crear otra factura',
-    viewInList: 'Ver en lista',
-    shortcut: {
-      title: 'Factura rápida',
-      description: 'Crea una factura pagada en dos pasos',
-      steps: { setup: 'Configuración', review: 'Revisión' },
-      continue: 'Continuar',
-      back: 'Volver',
-      cancel: 'Cancelar',
-      createPaid: 'Crear y registrar pago',
-      creating: 'Creando factura…',
-      openingInvoice: 'Abriendo factura…',
-      editPanelTitle: 'Ajustes rápidos',
-      discardTitle: '¿Descartar factura?',
-      discardDescription: 'Se perderán los datos ingresados.',
-      discardConfirm: 'Descartar',
-      noServices: `No hay servicios activos. Configúralos en ${BACKEND_NAME} web.`,
-      selectService: 'Selecciona un servicio',
-      payImmediatelyHelp: 'La factura se registrará como pagada al crearla.',
-      reviewConfirmLabel: 'Confirmar factura',
-      reviewConfirmHint: 'Revisa los datos antes de registrar el pago.',
-      billTo: 'Facturar a',
-      paymentSection: 'Pago',
-    },
-    fields: {
-      client: 'Cliente',
-      service: 'Servicio',
-      paymentMethod: 'Método de pago',
-      quantity: 'Cantidad',
-      issueDate: 'Fecha de emisión',
-      dueDate: 'Fecha de vencimiento',
-      taxRate: 'IVA %',
-      discount: 'Descuento',
-      notes: 'Notas',
-      reference: 'Referencia',
-      paymentDate: 'Fecha de pago',
-      paymentTime: 'Hora de pago',
-      paymentDetails: 'Datos del pago',
-    },
-    errors: {
-      clientRequired: 'Selecciona un cliente',
-      serviceRequired: 'Selecciona un servicio',
-      paymentRequired: 'Selecciona un método de pago',
-      paymentDetailsRequired: 'Completa los datos de pago móvil',
-      discountExceedsSubtotal: 'El descuento no puede superar el subtotal',
-    },
-    servicesLoadError: 'No se pudieron cargar los servicios.',
-    detail: {
-      invoiceNumber: 'Número',
-      status: 'Estado',
-      client: 'Cliente',
-      items: 'Artículos',
-      subtotal: 'Subtotal',
-      tax: 'IVA',
-      total: 'Total',
-      payment: 'Pago registrado',
-      paymentDetails: 'Datos del pago móvil',
-      notes: 'Notas',
-      issueDate: 'Emisión',
-      dueDate: 'Vencimiento',
-      viewInPagos: 'Ver en Pagos',
-      viewInvoice: 'Ver factura',
-      copyReference: 'Copiar referencia',
-      referenceCopied: 'Referencia copiada',
-      emitterPhone: 'Teléfono emisor',
-    },
-    search: {
-      placeholder: 'Buscar por referencia, factura o cliente…',
-      accessibility: 'Buscar facturas',
-      clear: 'Limpiar búsqueda',
-      referenceHint: 'Escribe al menos 4 dígitos para buscar por los últimos 4 de la referencia.',
-      noResults: (query: string) => `No hay facturas para "${query}".`,
-      noResultsHint: 'Revisa la pestaña Pagos por si el pago aún no tiene factura.',
-      localMatchBanner: 'Encontrado en Pagos en este dispositivo.',
-      lookupError: 'No se pudo buscar la factura por referencia.',
-      filters: {
-        all: 'Todas',
-        paid: 'Pagadas',
-        pending: 'Pendientes',
-      },
-      resultCount: (shown: number, total: number) =>
-        shown === total
-          ? `${shown} factura${shown === 1 ? '' : 's'}`
-          : `${shown} de ${total} facturas`,
-      activeFilter: (label: string) => `Filtro: ${label}`,
-      refChip: (ref: string) => `Ref · ${ref}`,
     },
   },
   ajustes: {
@@ -260,33 +131,13 @@ export const copy = {
     step: (current: number, total: number) => `Paso ${current} de ${total}`,
   },
   syncStatus: {
-    clientAssigned: 'Cliente asociado',
     paymentConfirmed: 'Pago confirmado',
-    paid: 'Pagado',
-    invoicePending: 'Factura pendiente',
+    synced: 'Sincronizado',
     pendingSync: 'Pendiente de sync',
     syncFailed: 'Error de sincronización',
     registered: 'Registrado',
     duplicate: 'Duplicado',
     hiddenContent: 'Contenido oculto',
-  },
-  clients: {
-    assignHint: 'Busca por nombre o cédula. El teléfono del emisor del pago no se usa.',
-    searchPlaceholder: 'Buscar cliente…',
-    createCta: 'Crear cliente',
-    fullNameLabel: 'Nombre completo',
-    fullNamePlaceholder: 'Nombre completo',
-    identityLabel: 'Cédula',
-    identityPlaceholder: 'Cédula',
-    phoneLabel: 'Teléfono (opcional)',
-    phonePlaceholder: 'Teléfono (opcional)',
-    saveAndAssign: 'Guardar y asociar',
-    creating: 'Creando…',
-    backToSearch: 'Volver a buscar',
-    noResults: 'Sin clientes encontrados',
-    noResultsHint: 'Prueba otro nombre o crea un cliente nuevo.',
-    searchError: 'No se pudo buscar clientes. Intenta de nuevo.',
-    retry: 'Reintentar',
   },
   feedback: {
     activity: {
@@ -400,10 +251,6 @@ export const copy = {
         removed > 0
           ? `Eliminamos ${countLabel(removed, 'registro antiguo', 'registros antiguos')} fuera del período configurado.`
           : 'No había registros fuera del período de retención.',
-    },
-    client: {
-      createdTitle: 'Cliente creado',
-      createdMessage: (name: string) => `${name} fue creado y asociado al pago.`,
     },
     connection: {
       okTitle: 'Conexión verificada',

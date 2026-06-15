@@ -19,11 +19,9 @@ const baseEntry: PaymentRegisterCacheEntry = {
   notificationId: 'notif-1',
   invoiceStatus: null,
   syncStatus: 'pending_sync',
-  assignedClientId: null,
-  assignedClientName: null,
   lastSyncError: null,
-    failureClass: null,
-    failureStage: null,
+  failureClass: null,
+  failureStage: null,
     createdAt: 1_700_000_000_000,
   updatedAt: 1_700_000_000_000,
 };

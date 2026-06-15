@@ -17,7 +17,6 @@ export type PaymentActionKind =
   | 'sync_and_confirm'
   | 'confirm_payment'
   | 'retry_sync'
-  | 'assign_client'
   | 'login_required'
   | 'pending_sync'
   | 'none';

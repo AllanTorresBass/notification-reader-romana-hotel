@@ -62,19 +62,6 @@ export function useConfirmPaymentMutation() {
   });
 }
 
-export function useAssignClientMutation() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (input: { localId: string; clientId: string; clientName?: string }) =>
-      paymentRegisterService.assignClient(input.localId, input.clientId, input.clientName),
-    onSuccess: () => {
-      invalidatePaymentQueries(queryClient);
-      void queryClient.removeQueries({ queryKey: queryKeys.clients.all });
-    },
-  });
-}
-
 export function useManualRegisterMutation() {
   const queryClient = useQueryClient();
   const { reportOutcome, reportError } = useAppFeedback();

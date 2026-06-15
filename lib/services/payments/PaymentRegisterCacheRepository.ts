@@ -90,8 +90,6 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
       | 'remoteInvoiceId'
       | 'invoiceStatus'
       | 'syncStatus'
-      | 'assignedClientId'
-      | 'assignedClientName'
       | 'lastSyncError'
       | 'failureClass'
       | 'failureStage'
@@ -103,8 +101,6 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
       remoteInvoiceId?: string | null;
       invoiceStatus?: PaymentRegisterCacheEntry['invoiceStatus'];
       syncStatus?: SyncStatus;
-      assignedClientId?: string | null;
-      assignedClientName?: string | null;
       lastSyncError?: string | null;
       failureClass?: PaymentRegisterCacheEntry['failureClass'];
       failureStage?: PaymentRegisterCacheEntry['failureStage'];
@@ -128,8 +124,6 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
       notificationId: input.notificationId,
       invoiceStatus: input.invoiceStatus ?? existing?.invoiceStatus ?? null,
       syncStatus: input.syncStatus ?? existing?.syncStatus ?? 'pending_sync',
-      assignedClientId: input.assignedClientId ?? existing?.assignedClientId ?? null,
-      assignedClientName: input.assignedClientName ?? existing?.assignedClientName ?? null,
       lastSyncError: input.lastSyncError ?? existing?.lastSyncError ?? null,
       failureClass: input.failureClass ?? existing?.failureClass ?? null,
       failureStage: input.failureStage ?? existing?.failureStage ?? null,
@@ -163,8 +157,6 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
         | 'name'
         | 'pago'
         | 'mobile'
-        | 'assignedClientId'
-        | 'assignedClientName'
         | 'failureClass'
         | 'failureStage'
       >

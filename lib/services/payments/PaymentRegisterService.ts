@@ -239,7 +239,7 @@ export class PaymentRegisterService {
     const entry = await paymentRegisterCacheRepository.getByLocalId(localId);
     if (!entry) return { entry: null, status: 'queued' };
 
-    if (entry.syncStatus === 'payment_confirmed' || entry.syncStatus === 'client_assigned') {
+    if (entry.syncStatus === 'payment_confirmed') {
       return { entry, status: 'already_done' };
     }
 
@@ -263,32 +263,6 @@ export class PaymentRegisterService {
 
     await paymentSyncQueue.enqueue('confirm_payment', localId);
     return { entry, status: 'queued' };
-  }
-
-  async assignClient(
-    localId: string,
-    clientId: string,
-    clientName?: string | null
-  ): Promise<PaymentActionResult> {
-    const entry = await paymentRegisterCacheRepository.getByLocalId(localId);
-    if (!entry) return { entry: null, status: 'queued' };
-
-    if (entry.syncStatus === 'client_assigned') {
-      return { entry, status: 'already_done' };
-    }
-
-    const clientPatch = {
-      assignedClientId: clientId,
-      assignedClientName: clientName?.trim() || null,
-    };
-
-    await paymentRegisterCacheRepository.updateByLocalId(localId, {
-      ...clientPatch,
-      syncStatus: 'client_assigned',
-      lastSyncError: null,
-    });
-    const updated = await paymentRegisterCacheRepository.getByLocalId(localId);
-    return { entry: updated, status: 'completed' };
   }
 
   async pullRemote(): Promise<void> {
@@ -403,21 +377,6 @@ export class PaymentRegisterService {
 
     if (type === 'confirm_payment') {
       await this.pushConfirmedPaymentToRemote(localId, entry);
-      return;
-    }
-
-    if (type === 'assign_client') {
-      const clientId = payload?.clientId as string | undefined;
-      const clientName = payload?.clientName as string | null | undefined;
-      if (!clientId) {
-        throw new Error('Missing client');
-      }
-      await paymentRegisterCacheRepository.updateByLocalId(localId, {
-        assignedClientId: clientId,
-        assignedClientName: clientName ?? null,
-        syncStatus: 'client_assigned',
-        lastSyncError: null,
-      });
       return;
     }
 

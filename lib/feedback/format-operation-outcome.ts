@@ -2,7 +2,6 @@ import { copy } from '@/constants/copy';
 import type { PaymentSyncResult } from '@/lib/services/payments/PaymentSyncOrchestrator';
 import type { NotificationShadeSyncResult } from '@/lib/services/native/notification-shade-sync';
 import {
-  formatAssignClientMessages,
   formatConfirmPaymentMessages,
 } from '@/lib/feedback/payment-action-messages';
 import { classifyError } from '@/lib/errors/classify-error';
@@ -54,23 +53,6 @@ export function formatConfirmPaymentOutcome(result: {
   const { title, message } = formatConfirmPaymentMessages(result.entry, result.status);
   return outcome('confirm_payment', resultStatusToOutcome(result.status), title, message, {
     meta: { pago: result.entry?.pago ?? '' },
-  });
-}
-
-export function formatAssignClientOutcome(
-  result: {
-    entry: PaymentRegisterCacheEntry | null;
-    status: ActionDispatchStatus;
-  },
-  clientName?: string
-): OperationOutcome {
-  const { title, message } = formatAssignClientMessages(
-    result.entry,
-    result.status,
-    clientName
-  );
-  return outcome('assign_client', resultStatusToOutcome(result.status), title, message, {
-    meta: { clientName: clientName ?? '', pago: result.entry?.pago ?? '' },
   });
 }
 
@@ -407,28 +389,6 @@ export function formatPurgeRetentionOutcome(removed: number): OperationOutcome {
     'completed',
     fb.storage.retentionAppliedTitle,
     fb.storage.retentionAppliedMessage(removed)
-  );
-}
-
-export function formatCreateClientOutcome(clientName: string): OperationOutcome {
-  return outcome(
-    'create_client',
-    'completed',
-    fb.client.createdTitle,
-    fb.client.createdMessage(clientName)
-  );
-}
-
-export function formatCreateInvoiceOutcome(invoice: {
-  id: string;
-  invoiceNumber: string;
-}): OperationOutcome {
-  return outcome(
-    'create_invoice',
-    'completed',
-    copy.facturas.successTitle,
-    copy.facturas.successMessage(invoice.invoiceNumber),
-    { meta: { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber } }
   );
 }
 

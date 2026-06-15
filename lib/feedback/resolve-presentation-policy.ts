@@ -8,13 +8,10 @@ import type { OperationKind } from '@/types/feedback/operation-outcome.types';
 
 const PASSIVE_FETCH_KINDS: OperationKind[] = [
   'list_fetch',
-  'invoice_list_fetch',
-  'invoice_detail_fetch',
-  'client_search',
   'notification_list_fetch',
 ];
 
-const FORM_INLINE_KINDS: OperationKind[] = ['login', 'create_client'];
+const FORM_INLINE_KINDS: OperationKind[] = ['login'];
 
 function isPassiveFetch(kind: OperationKind, context: PresentationContext): boolean {
   return PASSIVE_FETCH_KINDS.includes(kind) && !context.isUserInitiated;
@@ -25,11 +22,7 @@ function isContextualAction(
   anchor: FeedbackAnchor | undefined
 ): boolean {
   if (kind === 'confirm_payment' && anchor === 'detail-sheet') return true;
-  if (kind === 'assign_client' && (anchor === 'assign-sheet' || anchor === 'detail-sheet')) {
-    return true;
-  }
   if (FORM_INLINE_KINDS.includes(kind) && anchor === 'form') return true;
-  if (kind === 'create_invoice' && anchor === 'form') return true;
   return false;
 }
 
@@ -50,16 +43,12 @@ export function resolvePresentationPolicy({
   }
 
   if (isContextualAction(kind, anchor)) {
-    const surfaces: PresentationPolicy['surfaces'] = ['inline', 'log'];
-    if (kind === 'assign_client' && anchor === 'detail-sheet') {
-      surfaces.unshift('banner');
-    }
     return {
       toast: false,
       log: true,
       sync: true,
       haptic: true,
-      surfaces,
+      surfaces: ['inline', 'log'],
     };
   }
 

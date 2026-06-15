@@ -34,7 +34,6 @@ const KNOWN_TECHNICAL_MESSAGES: Record<string, string> = {
   'Could not remove package history': 'No se pudo eliminar el historial de la app.',
   'Sync failed': `No se pudo sincronizar con ${BACKEND_NAME}. Intenta de nuevo.`,
   'Confirm failed': 'No se pudo confirmar el pago. Intenta de nuevo.',
-  'Assign failed': 'No se pudo asociar el cliente. Intenta de nuevo.',
 };
 
 const DEFAULT_FALLBACK: Record<UserErrorContext, string> = {

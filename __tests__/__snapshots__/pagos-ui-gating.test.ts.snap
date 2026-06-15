@@ -1,8 +1,7 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`Pagos UI gating snapshots admin — full write surface 1`] = `
 {
-  "canCreateInvoice": true,
   "isAuthenticated": true,
   "role": "admin",
   "showManualRegister": true,
@@ -11,7 +10,6 @@ exports[`Pagos UI gating snapshots admin — full write surface 1`] = `
 
 exports[`Pagos UI gating snapshots analyst — read-only mobile surface 1`] = `
 {
-  "canCreateInvoice": false,
   "isAuthenticated": true,
   "role": "analyst",
   "showManualRegister": false,
@@ -20,7 +18,6 @@ exports[`Pagos UI gating snapshots analyst — read-only mobile surface 1`] = `
 
 exports[`Pagos UI gating snapshots salesperson — field write surface 1`] = `
 {
-  "canCreateInvoice": true,
   "isAuthenticated": true,
   "role": "salesperson",
   "showManualRegister": true,
@@ -29,7 +26,6 @@ exports[`Pagos UI gating snapshots salesperson — field write surface 1`] = `
 
 exports[`Pagos UI gating snapshots unauthenticated — no write actions 1`] = `
 {
-  "canCreateInvoice": false,
   "isAuthenticated": false,
   "role": "admin",
   "showManualRegister": true,

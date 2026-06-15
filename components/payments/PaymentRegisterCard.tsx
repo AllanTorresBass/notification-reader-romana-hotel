@@ -12,6 +12,7 @@ import { MIN_TOUCH_TARGET } from '@/constants/touch';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 import { getPaymentActionHint } from '@/lib/utils/filter-payment-registers';
 import { formatPagoDisplay, formatSyncStatusLabel } from '@/lib/utils/format-pago';
+import { formatPaymentDateTime } from '@/lib/utils/format-payment-datetime';
 import type { PaymentRegisterCacheEntry } from '@/types/payment/payment-register-cache.types';
 
 interface PaymentRegisterCardProps {
@@ -23,7 +24,7 @@ function getBadgeVariant(
   syncStatus: string
 ): 'default' | 'secondary' | 'destructive' | 'success' | 'warning' {
   if (syncStatus === 'sync_failed') return 'destructive';
-  if (syncStatus === 'payment_confirmed' || syncStatus === 'client_assigned') return 'success';
+  if (syncStatus === 'payment_confirmed') return 'success';
   if (syncStatus === 'pending_sync') return 'warning';
   return 'secondary';
 }
@@ -33,7 +34,7 @@ function getAccentColor(
   colors: ReturnType<typeof useThemeColors>['colors']
 ): string {
   if (syncStatus === 'sync_failed') return colors.danger;
-  if (syncStatus === 'payment_confirmed' || syncStatus === 'client_assigned') {
+  if (syncStatus === 'payment_confirmed') {
     return colors.success;
   }
   if (syncStatus === 'pending_sync') return colors.warning;
@@ -41,10 +42,13 @@ function getAccentColor(
 }
 
 function getSecondaryLine(entry: PaymentRegisterCacheEntry): string {
-  if (entry.ref && entry.paymentDate) {
-    return `Ref ${entry.ref} · ${entry.paymentDate}`;
-  }
-  if (entry.ref) return `Ref ${entry.ref}`;
+  const parts: string[] = [];
+  if (entry.ref) parts.push(`Ref ${entry.ref}`);
+
+  const when = formatPaymentDateTime(entry.paymentDate, entry.paymentTime);
+  if (when) parts.push(when);
+
+  if (parts.length > 0) return parts.join(' · ');
   return `${copy.pagos.detail.emitterPhone}: ${entry.mobile}`;
 }
 
@@ -79,11 +83,7 @@ export function PaymentRegisterCard({ entry, onPress }: PaymentRegisterCardProps
           {getSecondaryLine(entry)}
         </ThemedText>
 
-        {entry.assignedClientName ? (
-          <ThemedText variant="caption" style={{ color: colors.success }} numberOfLines={1}>
-            {entry.assignedClientName}
-          </ThemedText>
-        ) : entry.name ? (
+        {entry.name ? (
           <Badge label={entry.name} variant="secondary" />
         ) : null}
 

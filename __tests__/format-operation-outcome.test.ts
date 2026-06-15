@@ -1,10 +1,8 @@
 import { copy } from '@/constants/copy';
 import {
-  formatAssignClientOutcome,
   formatCaptureBatchOutcome,
   formatConfirmPaymentOutcome,
   formatCaptureNotificationOutcome,
-  formatCreateInvoiceOutcome,
   formatEntitySyncError,
   formatManualRegisterOutcome,
   formatPullSyncOutcome,
@@ -20,8 +18,8 @@ const baseEntry: PaymentRegisterCacheEntry = {
   invoiceStatus: null,
   syncStatus: 'pending_sync',
   lastSyncError: null,
-  assignedClientId: null,
-  assignedClientName: null,
+  failureClass: null,
+  failureStage: null,
   name: null,
   pago: '15000.00',
   mobile: '0412-1222392',
@@ -46,32 +44,13 @@ describe('formatConfirmPaymentOutcome', () => {
     const outcome = formatConfirmPaymentOutcome({ entry: baseEntry, status: 'completed' });
     expect(outcome.status).toBe('completed');
     expect(outcome.title).toBe('Pago confirmado');
-    expect(outcome.message).toContain('factura quedó marcada como pagada');
+    expect(outcome.message).toContain('quedó registrado');
   });
 
   it('returns skipped when already done', () => {
     const outcome = formatConfirmPaymentOutcome({ entry: baseEntry, status: 'already_done' });
     expect(outcome.status).toBe('skipped');
     expect(outcome.title).toBe(copy.pagos.actions.confirm.alreadyTitle);
-  });
-});
-
-describe('formatAssignClientOutcome', () => {
-  it('returns queued message when offline', () => {
-    const outcome = formatAssignClientOutcome({ entry: baseEntry, status: 'queued' }, 'Ana López');
-    expect(outcome.status).toBe('queued');
-    expect(outcome.title).toBe(copy.pagos.actions.assign.queuedTitle);
-    expect(outcome.message).toContain('Ana López');
-  });
-
-  it('returns completed on success', () => {
-    const outcome = formatAssignClientOutcome(
-      { entry: baseEntry, status: 'completed' },
-      'Ana López'
-    );
-    expect(outcome.status).toBe('completed');
-    expect(outcome.title).toBe('Cliente asociado');
-    expect(outcome.message).toContain('Ana López');
   });
 });
 
@@ -238,15 +217,6 @@ describe('formatQueueRetryOutcome', () => {
     const outcome = formatQueueRetryOutcome({ processed: 3, failed: 0, pendingJobs: 0 });
     expect(outcome.status).toBe('completed');
     expect(outcome.title).toBe(copy.feedback.queue.completedTitle);
-  });
-});
-
-describe('formatCreateInvoiceOutcome', () => {
-  it('returns success copy with invoice number', () => {
-    const outcome = formatCreateInvoiceOutcome({ id: 'inv-1', invoiceNumber: 'FAC-001' });
-    expect(outcome.status).toBe('completed');
-    expect(outcome.title).toBe(copy.facturas.successTitle);
-    expect(outcome.message).toContain('FAC-001');
   });
 });
 
