@@ -1,11 +1,10 @@
-import { canAccessNewInvoiceScreen, canManageInvoices, canWritePayments, hasPermission, shouldShowManualRegisterButton } from '@/lib/auth/permissions';
+import { canWritePayments, hasPermission, shouldShowManualRegisterButton } from '@/lib/auth/permissions';
 
 describe('permissions', () => {
   it('grants admin full payment and team access', () => {
     expect(hasPermission('admin', { resource: 'payment', action: 'delete' })).toBe(true);
     expect(hasPermission('admin', { resource: 'users', action: 'manage' })).toBe(true);
     expect(canWritePayments('admin')).toBe(true);
-    expect(canManageInvoices('admin')).toBe(true);
   });
 
   it('restricts analyst to read-only payment and dashboard', () => {
@@ -13,7 +12,6 @@ describe('permissions', () => {
     expect(hasPermission('analyst', { resource: 'payment', action: 'create' })).toBe(false);
     expect(hasPermission('analyst', { resource: 'dashboard', action: 'read' })).toBe(true);
     expect(canWritePayments('analyst')).toBe(false);
-    expect(canManageInvoices('analyst')).toBe(false);
   });
 
   it('allows salesperson payment CRUD without team or dashboard', () => {
@@ -21,24 +19,16 @@ describe('permissions', () => {
     expect(hasPermission('salesperson', { resource: 'dashboard', action: 'read' })).toBe(false);
     expect(hasPermission('salesperson', { resource: 'users', action: 'manage' })).toBe(false);
     expect(canWritePayments('salesperson')).toBe(true);
-    expect(canManageInvoices('salesperson')).toBe(true);
   });
 });
 
 describe('UI gating helpers', () => {
-  it('hides manual register and invoice create for analyst', () => {
+  it('hides manual register for analyst', () => {
     expect(shouldShowManualRegisterButton('analyst')).toBe(false);
-    expect(canAccessNewInvoiceScreen('analyst', true)).toBe(false);
   });
 
-  it('shows write actions for admin and salesperson when authenticated', () => {
+  it('shows write actions for admin and salesperson', () => {
     expect(shouldShowManualRegisterButton('admin')).toBe(true);
     expect(shouldShowManualRegisterButton('salesperson')).toBe(true);
-    expect(canAccessNewInvoiceScreen('salesperson', true)).toBe(true);
-    expect(canAccessNewInvoiceScreen('admin', true)).toBe(true);
-  });
-
-  it('blocks invoice create when not authenticated', () => {
-    expect(canAccessNewInvoiceScreen('admin', false)).toBe(false);
   });
 });

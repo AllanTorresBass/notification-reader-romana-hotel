@@ -34,14 +34,6 @@ export function canWritePayments(role: UserRole): boolean {
   );
 }
 
-export function canManageInvoices(role: UserRole): boolean {
-  return hasPermission(role, { resource: 'payment', action: 'create' });
-}
-
-export function canAccessNewInvoiceScreen(role: UserRole, isAuthenticated: boolean): boolean {
-  return isAuthenticated && canManageInvoices(role);
-}
-
 export function shouldShowManualRegisterButton(role: UserRole): boolean {
   return canWritePayments(role);
 }

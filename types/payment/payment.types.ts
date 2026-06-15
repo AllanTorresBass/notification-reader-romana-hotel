@@ -1,26 +1,5 @@
 export type PaymentType = 'efectivo_bs' | 'efectivo_usd' | 'pago_movil';
 
-export interface InvoicePaymentLinkedRegister {
-  id: string;
-  mobile: string | null;
-  notificationKey: string | null;
-}
-
-export interface InvoicePayment {
-  id: string;
-  invoiceId: string;
-  clientId: string;
-  paymentType: PaymentType;
-  amount: number;
-  currency: string;
-  reference: string | null;
-  paymentDate: string | null;
-  paymentTime: string | null;
-  createdAt: string;
-  updatedAt: string;
-  linkedRegister?: InvoicePaymentLinkedRegister;
-}
-
 export const PAYMENT_TYPES: { value: PaymentType; label: string }[] = [
   { value: 'efectivo_bs', label: 'Efectivo en Bs' },
   { value: 'efectivo_usd', label: 'Efectivo en $' },

@@ -1,4 +1,4 @@
-import { canAccessNewInvoiceScreen, shouldShowManualRegisterButton } from '@/lib/auth/permissions';
+import { shouldShowManualRegisterButton } from '@/lib/auth/permissions';
 import type { UserRole } from '@/types/auth.types';
 
 function pagosUiGating(role: UserRole, isAuthenticated = true) {
@@ -6,7 +6,6 @@ function pagosUiGating(role: UserRole, isAuthenticated = true) {
     role,
     isAuthenticated,
     showManualRegister: shouldShowManualRegisterButton(role),
-    canCreateInvoice: canAccessNewInvoiceScreen(role, isAuthenticated),
   };
 }
 

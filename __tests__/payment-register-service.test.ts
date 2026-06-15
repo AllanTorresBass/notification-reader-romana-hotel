@@ -26,10 +26,6 @@ jest.mock('@/lib/services/notifications/NotificationRepository', () => ({
   },
 }));
 
-jest.mock('@/lib/api-client/payment-registers/PaymentRegisterApiService', () => ({
-  paymentRegisterApiService: { create: jest.fn() },
-}));
-
 jest.mock('@/stores/api-auth-store', () => ({
   useApiAuthStore: { getState: () => ({ isAuthenticated: () => false }) },
 }));

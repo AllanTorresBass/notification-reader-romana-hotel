@@ -44,14 +44,4 @@ describe('resolvePresentationPolicy', () => {
     expect(policy.toast).toBe(false);
     expect(policy.surfaces).toEqual(['log']);
   });
-
-  it('shows banner surface for assign client from detail sheet', () => {
-    const policy = resolvePresentationPolicy({
-      kind: 'assign_client',
-      context: { anchor: 'detail-sheet' },
-    });
-    expect(policy.toast).toBe(false);
-    expect(policy.surfaces).toContain('banner');
-    expect(policy.surfaces).toContain('inline');
-  });
 });

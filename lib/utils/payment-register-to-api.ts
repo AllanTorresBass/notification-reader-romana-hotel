@@ -1,5 +1,6 @@
 import { BANCO_DE_VENEZUELA_LABEL } from '@/constants/whitelist-defaults';
 import type { CreatePaymentInput, UpdatePaymentInput } from '@/lib/api-client/payments/PaymentApiService';
+import { normalizePagoAmount } from '@/lib/utils/bdv-pagomovil-parser';
 import type { PaymentRegisterCacheEntry } from '@/types/payment/payment-register-cache.types';
 
 function resolveReference(entry: PaymentRegisterCacheEntry): string {
@@ -24,16 +25,41 @@ function resolveStatus(entry: PaymentRegisterCacheEntry): 'confirmado' | 'pendie
   return hasRef && hasDate ? 'confirmado' : 'pendiente';
 }
 
-export function cacheEntryToCreatePaymentInput(
-  entry: PaymentRegisterCacheEntry
+function optionalString(value: string | null | undefined): string | undefined {
+  if (value == null) return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+/** API amount must match /^\\d+(\\.\\d{1,2})?$/ — normalize Venezuelan formats first. */
+export function resolveApiAmount(pago: string): string {
+  const trimmed = pago.trim();
+  if (!trimmed) return '0.00';
+
+  if (trimmed.includes(',')) {
+    return normalizePagoAmount(trimmed);
+  }
+
+  // Thousands separator without decimals: 15.000 → 15000.00
+  if (/^\d{1,3}(\.\d{3})+$/.test(trimmed)) {
+    const withoutThousands = trimmed.replace(/\./g, '');
+    return Number.parseFloat(withoutThousands).toFixed(2);
+  }
+
+  return normalizePagoAmount(trimmed);
+}
+
+function buildPaymentPayload(
+  entry: PaymentRegisterCacheEntry,
+  status: 'confirmado' | 'pendiente'
 ): CreatePaymentInput {
   return {
     reference: resolveReference(entry),
-    amount: entry.pago,
-    payerName: entry.name,
-    payerPhone: isSyncableMobile(entry.mobile) ? entry.mobile : undefined,
+    amount: resolveApiAmount(entry.pago),
+    payerName: optionalString(entry.name),
+    payerPhone: isSyncableMobile(entry.mobile) ? optionalString(entry.mobile) : undefined,
     bank: BANCO_DE_VENEZUELA_LABEL,
-    status: resolveStatus(entry),
+    status,
     paymentDate: resolvePaymentDate(entry),
     paymentTime: resolvePaymentTime(entry),
     notificationKey: entry.notificationKey,
@@ -41,43 +67,26 @@ export function cacheEntryToCreatePaymentInput(
   };
 }
 
+export function cacheEntryToCreatePaymentInput(
+  entry: PaymentRegisterCacheEntry
+): CreatePaymentInput {
+  return buildPaymentPayload(entry, resolveStatus(entry));
+}
+
 export function cacheEntryToUpdatePaymentInput(
   entry: PaymentRegisterCacheEntry
 ): UpdatePaymentInput {
-  return {
-    reference: resolveReference(entry),
-    amount: entry.pago,
-    payerName: entry.name,
-    payerPhone: isSyncableMobile(entry.mobile) ? entry.mobile : undefined,
-    bank: BANCO_DE_VENEZUELA_LABEL,
-    status: 'confirmado',
-    paymentDate: resolvePaymentDate(entry),
-    paymentTime: resolvePaymentTime(entry),
-    notificationKey: entry.notificationKey,
-    source: 'mobile',
-  };
+  return buildPaymentPayload(entry, 'confirmado');
 }
 
 /** Create payload when confirming a payment that was never synced to the server. */
 export function cacheEntryToConfirmedCreateInput(
   entry: PaymentRegisterCacheEntry
 ): CreatePaymentInput {
-  const update = cacheEntryToUpdatePaymentInput(entry);
-  return {
-    reference: update.reference,
-    amount: update.amount,
-    payerName: update.payerName,
-    payerPhone: update.payerPhone,
-    bank: update.bank,
-    status: 'confirmado',
-    paymentDate: update.paymentDate,
-    paymentTime: update.paymentTime,
-    notificationKey: entry.notificationKey,
-    source: 'mobile',
-  };
+  return buildPaymentPayload(entry, 'confirmado');
 }
 
 function isSyncableMobile(mobile: string): boolean {
   const trimmed = mobile.trim();
-  return Boolean(trimmed) && trimmed !== 'sin-leer';
+  return Boolean(trimmed) && trimmed !== 'sin-leer' && trimmed !== 'sin-telefono';
 }

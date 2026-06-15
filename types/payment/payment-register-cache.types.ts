@@ -4,7 +4,6 @@ export type SyncStatus =
   | 'pending_sync'
   | 'synced'
   | 'payment_confirmed'
-  | 'client_assigned'
   | 'sync_failed';
 
 export type PaymentRegisterInvoiceStatus = 'pending' | 'paid' | null;
@@ -23,8 +22,6 @@ export interface PaymentRegisterCacheEntry {
   notificationId: string;
   invoiceStatus: PaymentRegisterInvoiceStatus;
   syncStatus: SyncStatus;
-  assignedClientId: string | null;
-  assignedClientName: string | null;
   lastSyncError: string | null;
   failureClass: PaymentFailureClass | null;
   failureStage: PaymentFailureStage | null;
@@ -39,7 +36,6 @@ export type PaymentStatusFilter =
   | 'needs_action'
   | 'pending_sync'
   | 'sync_failed'
-  | 'awaiting_assign'
   | 'completed';
 
 export interface PaymentRegisterListFilters {
@@ -52,7 +48,6 @@ export interface PaymentRegisterFilterCounts {
   needs_action: number;
   pending_sync: number;
   sync_failed: number;
-  awaiting_assign: number;
   completed: number;
 }
 
@@ -65,7 +60,6 @@ export interface PaymentRegisterListPage {
 export type PaymentSyncJobType =
   | 'create_register'
   | 'confirm_payment'
-  | 'assign_client'
   | 'pull_registers';
 
 export interface PaymentSyncJob {

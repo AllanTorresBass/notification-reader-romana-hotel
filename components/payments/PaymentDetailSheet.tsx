@@ -1,5 +1,4 @@
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { useRouter } from 'expo-router';
 import { forwardRef, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -21,15 +20,15 @@ import {
   formatSyncStatusLabel,
   formatPagoDisplay,
 } from '@/lib/utils/format-pago';
-import { canAssignClientToPayment } from '@/lib/utils/merge-payment-register-state';
+import { formatPaymentDate, formatPaymentTime } from '@/lib/utils/format-payment-datetime';
+import { isPaymentWorkflowComplete } from '@/lib/utils/merge-payment-register-state';
 import type { OperationOutcome } from '@/types/feedback/operation-outcome.types';
 import type { PaymentRegisterCacheEntry } from '@/types/payment/payment-register-cache.types';
 
-interface PaymentDetailSheetProps {
+export interface PaymentDetailSheetProps {
   entry: PaymentRegisterCacheEntry | null;
   actionFeedback: OperationOutcome | null;
   onConfirmPayment: () => void;
-  onAssignClient: () => void;
   onCompleteManual?: () => void;
   isConfirming: boolean;
   canWrite?: boolean;
@@ -41,26 +40,22 @@ export const PaymentDetailSheet = forwardRef<BottomSheet, PaymentDetailSheetProp
       entry,
       actionFeedback,
       onConfirmPayment,
-      onAssignClient,
       onCompleteManual,
       isConfirming,
       canWrite = true,
     },
     ref
   ) {
-    const router = useRouter();
     const { colors } = useThemeColors();
     const snapPoints = useMemo(() => ['55%', '90%'], []);
 
     const canConfirm = entry ? canConfirmPayment(entry) : false;
-    const canAssign = entry ? canAssignClientToPayment(entry) : false;
     const paymentAction = entry ? resolvePaymentAction(entry) : null;
     const confirmLabel =
       paymentAction?.kind === 'sync_and_confirm'
         ? copy.pagos.actions.confirm.syncAndConfirmCta
         : copy.pagos.actions.confirm.cta;
-    const isConfirmed =
-      entry?.syncStatus === 'payment_confirmed' || entry?.syncStatus === 'client_assigned';
+    const isConfirmed = entry ? isPaymentWorkflowComplete(entry) : false;
 
     const missingFields = useMemo(() => {
       if (!entry || isConfirmed) return [];
@@ -71,11 +66,6 @@ export const PaymentDetailSheet = forwardRef<BottomSheet, PaymentDetailSheetProp
     }, [entry, isConfirmed]);
 
     const showMissingBanner = missingFields.length > 0 && !canConfirm;
-
-    const showNextStep =
-      actionFeedback?.status === 'completed' &&
-      actionFeedback.kind === 'confirm_payment' &&
-      canAssign;
 
     return (
       <BottomSheet
@@ -101,8 +91,7 @@ export const PaymentDetailSheet = forwardRef<BottomSheet, PaymentDetailSheetProp
                     variant={
                       entry.syncStatus === 'sync_failed'
                         ? 'destructive'
-                        : entry.syncStatus === 'payment_confirmed' ||
-                            entry.syncStatus === 'client_assigned'
+                        : isConfirmed
                           ? 'success'
                           : entry.syncStatus === 'pending_sync'
                             ? 'warning'
@@ -127,40 +116,20 @@ export const PaymentDetailSheet = forwardRef<BottomSheet, PaymentDetailSheetProp
                 />
                 <DetailRow
                   label={copy.pagos.detail.date}
-                  value={entry.paymentDate || '—'}
+                  value={formatPaymentDate(entry.paymentDate)}
                   missing={!entry.paymentDate && !isConfirmed}
                 />
-                <DetailRow label={copy.pagos.detail.time} value={entry.paymentTime || '—'} />
+                <DetailRow label={copy.pagos.detail.time} value={formatPaymentTime(entry.paymentTime)} />
                 <DetailRow
                   label={copy.pagos.detail.name}
                   value={entry.name ?? copy.pagos.detail.noName}
                 />
               </View>
 
-              {entry.assignedClientName ? (
-                <>
-                  <ThemedText variant="label" muted>
-                    {copy.pagos.detail.clientData}
-                  </ThemedText>
-                  <DetailRow
-                    label={copy.pagos.detail.assignedClient}
-                    value={entry.assignedClientName}
-                  />
-                </>
-              ) : null}
-
               <PaymentStatusStepper
                 syncStatus={entry.syncStatus}
                 invoiceStatus={entry.invoiceStatus}
               />
-
-              {entry.remoteInvoiceId ? (
-                <PrimaryButton
-                  label={copy.facturas.detail.viewInvoice}
-                  variant="secondary"
-                  onPress={() => router.push(`/invoices/${entry.remoteInvoiceId}`)}
-                />
-              ) : null}
 
               {showMissingBanner ? (
                 <Banner
@@ -183,38 +152,19 @@ export const PaymentDetailSheet = forwardRef<BottomSheet, PaymentDetailSheetProp
                 />
               ) : null}
 
-              {showNextStep ? (
-                <ThemedText variant="caption" style={{ color: colors.success }}>
-                  {copy.pagos.actions.confirm.nextStep}
-                </ThemedText>
-              ) : null}
-
               <View style={styles.actions}>
                 {canWrite && canConfirm ? (
                   <PrimaryButton
-                    label={
-                      isConfirming
-                        ? copy.pagos.actions.confirm.confirming
-                        : confirmLabel
-                    }
+                    label={isConfirming ? copy.pagos.actions.confirm.confirming : confirmLabel}
                     onPress={onConfirmPayment}
                     disabled={isConfirming}
                     loading={isConfirming}
                   />
                 ) : null}
 
-                {canWrite && canAssign ? (
-                  <PrimaryButton
-                    label={copy.pagos.actions.assign.assignCta}
-                    variant={showNextStep || !canConfirm ? 'primary' : 'secondary'}
-                    onPress={onAssignClient}
-                  />
-                ) : null}
-
-                {!canWrite && (canConfirm || canAssign) ? (
+                {!canWrite && canConfirm ? (
                   <ThemedText variant="caption" muted style={{ textAlign: 'center' }}>
-                    {copy.pagos.readOnlyHint} Contacta a un administrador para confirmar o asignar
-                    clientes.
+                    {copy.pagos.readOnlyHint}
                   </ThemedText>
                 ) : null}
               </View>

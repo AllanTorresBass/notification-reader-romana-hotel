@@ -9,7 +9,7 @@ interface PaymentStatusStepperProps {
   invoiceStatus: 'pending' | 'paid' | null;
 }
 
-const STEPS = 4;
+const STEPS = 3;
 
 export function PaymentStatusStepper({ syncStatus, invoiceStatus }: PaymentStatusStepperProps) {
   const { colors } = useThemeColors();

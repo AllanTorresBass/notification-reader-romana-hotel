@@ -1,4 +1,3 @@
-import { canAssignClientToPayment } from '@/lib/utils/merge-payment-register-state';
 import type { PaymentRegisterCacheEntry } from '@/types/payment/payment-register-cache.types';
 import type {
   PaymentActionKind,
@@ -15,7 +14,7 @@ function hasRequiredPaymentData(entry: PaymentRegisterCacheEntry): boolean {
 
 function hasSyncableMobile(mobile: string): boolean {
   const trimmed = mobile.trim();
-  return Boolean(trimmed) && trimmed !== 'sin-leer';
+  return Boolean(trimmed) && trimmed !== 'sin-leer' && trimmed !== 'sin-telefono';
 }
 
 export function resolvePaymentAction(
@@ -24,10 +23,7 @@ export function resolvePaymentAction(
 ): ResolvedPaymentAction {
   const isAuthenticated = options.isAuthenticated ?? true;
 
-  if (entry.syncStatus === 'payment_confirmed' || entry.syncStatus === 'client_assigned') {
-    if (canAssignClientToPayment(entry) && !entry.assignedClientId) {
-      return { kind: 'assign_client', hint: 'Asociar cliente →', actionable: true };
-    }
+  if (entry.syncStatus === 'payment_confirmed') {
     return { kind: 'none', hint: null, actionable: false };
   }
 

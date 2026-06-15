@@ -6,7 +6,6 @@ import {
   View,
 } from 'react-native';
 
-import { AssignClientSheet } from '@/components/payments/AssignClientSheet';
 import { ManualRegisterForm } from '@/components/payments/ManualRegisterForm';
 import { PaymentDetailSheet } from '@/components/payments/PaymentDetailSheet';
 import { PagosManualRegisterButton } from '@/components/payments/PagosManualRegisterButton';
@@ -113,7 +112,7 @@ export default function PagosScreen() {
             title={copy.pagos.filters.emptyTitle}
             description={copy.pagos.filters.emptyDescription}
             action={
-              feed.hasActiveFilter ? (
+              feed.showClearFiltersOnEmpty ? (
                 <PrimaryButton
                   label={copy.pagos.filters.clearFilters}
                   onPress={feed.clearFilters}
@@ -162,19 +161,9 @@ export default function PagosScreen() {
         entry={feed.selected}
         actionFeedback={feed.detailFeedback}
         onConfirmPayment={feed.handleConfirmPayment}
-        onAssignClient={feed.handleAssignClient}
         onCompleteManual={feed.handleCompleteManual}
         isConfirming={feed.confirmPayment.isPending}
         canWrite={canWritePayments}
-      />
-
-      <AssignClientSheet
-        ref={feed.assignRef}
-        onAssign={feed.handleAssign}
-        onBack={feed.handleBackFromAssign}
-        isAssigning={feed.assignClient.isPending}
-        assigningClientId={feed.assigningClientId}
-        resetToken={feed.assignSheetResetToken}
       />
     </AppScreen>
   );

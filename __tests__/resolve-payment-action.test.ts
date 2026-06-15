@@ -18,8 +18,6 @@ function makeEntry(
     notificationId: 'notif-1',
     invoiceStatus: null,
     syncStatus: 'synced',
-    assignedClientId: null,
-    assignedClientName: null,
     lastSyncError: null,
     failureClass: null,
     failureStage: null,

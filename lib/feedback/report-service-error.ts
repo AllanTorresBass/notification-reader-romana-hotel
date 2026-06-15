@@ -14,7 +14,7 @@ import type { OperationKind, OperationOutcome } from '@/types/feedback/operation
 
 export interface ServiceErrorContext {
   source: string;
-  entityType?: 'payment' | 'notification' | 'invoice' | 'job';
+  entityType?: 'payment' | 'notification' | 'job';
   entityId?: string;
   reason?: string;
   jobType?: string;

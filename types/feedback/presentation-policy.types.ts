@@ -4,7 +4,6 @@ export type FeedbackSurface = 'toast' | 'banner' | 'inline' | 'field' | 'empty' 
 
 export type FeedbackAnchor =
   | 'detail-sheet'
-  | 'assign-sheet'
   | 'form'
   | 'list'
   | 'screen'

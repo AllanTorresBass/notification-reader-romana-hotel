@@ -3,6 +3,7 @@ import {
   filterPaymentRegisters,
   getPaymentActionHint,
   getPaymentFilterCounts,
+  paymentNeedsAction,
 } from '@/lib/utils/filter-payment-registers';
 import type { PaymentRegisterCacheEntry } from '@/types/payment/payment-register-cache.types';
 
@@ -23,8 +24,6 @@ function makeEntry(
     notificationId: 'notif-1',
     invoiceStatus: null,
     syncStatus: 'synced',
-    assignedClientId: null,
-    assignedClientName: null,
     lastSyncError: null,
     failureClass: null,
     failureStage: null,
@@ -44,7 +43,7 @@ describe('filterPaymentRegisters', () => {
       ref: '222',
       paymentDate: '2026-06-02',
     }),
-    makeEntry({ localId: '3', syncStatus: 'client_assigned', assignedClientId: 'c1', assignedClientName: 'Ana' }),
+    makeEntry({ localId: '3', syncStatus: 'payment_confirmed', invoiceStatus: 'paid', name: 'Ana' }),
     makeEntry({ localId: '4', syncStatus: 'pending_sync' }),
     makeEntry({ localId: '5', syncStatus: 'sync_failed', ref: '', paymentDate: '' }),
     makeEntry({ localId: '6', mobile: '04249876543', pago: '25000.00' }),
@@ -54,15 +53,15 @@ describe('filterPaymentRegisters', () => {
     expect(filterPaymentRegisters(entries, { status: 'all' })).toHaveLength(6);
   });
 
-  it('filters needs_action entries', () => {
+  it('filters needs_action entries with actionable payments only', () => {
     const result = filterPaymentRegisters(entries, { status: 'needs_action' });
     const ids = result.map((e) => e.localId);
     expect(ids).toContain('1');
-    expect(ids).toContain('2');
-    expect(ids).toContain('4');
+    expect(ids).toContain('5');
     expect(ids).toContain('6');
+    expect(ids).not.toContain('2');
     expect(ids).not.toContain('3');
-    expect(ids).not.toContain('5');
+    expect(ids).not.toContain('4');
   });
 
   it('filters pending_sync', () => {
@@ -77,16 +76,10 @@ describe('filterPaymentRegisters', () => {
     expect(result[0].localId).toBe('5');
   });
 
-  it('filters awaiting_assign', () => {
-    const result = filterPaymentRegisters(entries, { status: 'awaiting_assign' });
-    expect(result).toHaveLength(1);
-    expect(result[0].localId).toBe('2');
-  });
-
   it('filters completed', () => {
     const result = filterPaymentRegisters(entries, { status: 'completed' });
-    expect(result).toHaveLength(1);
-    expect(result[0].localId).toBe('3');
+    expect(result).toHaveLength(2);
+    expect(result.map((e) => e.localId)).toEqual(expect.arrayContaining(['2', '3']));
   });
 
   it('searches by mobile', () => {
@@ -101,10 +94,20 @@ describe('filterPaymentRegisters', () => {
     expect(result[0].localId).toBe('6');
   });
 
-  it('searches by assigned client name', () => {
+  it('searches by payer name', () => {
     const result = filterPaymentRegisters(entries, { status: 'all', search: 'ana' });
     expect(result).toHaveLength(1);
     expect(result[0].localId).toBe('3');
+  });
+
+  it('searches by formatted payment date', () => {
+    const result = filterPaymentRegisters(entries, { status: 'all', search: 'jun 2026' });
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it('searches by payment time', () => {
+    const result = filterPaymentRegisters(entries, { status: 'all', search: '10:30' });
+    expect(result.length).toBeGreaterThan(0);
   });
 
   it('returns empty for non-matching search', () => {
@@ -121,17 +124,27 @@ describe('getPaymentFilterCounts', () => {
     const entries = [
       makeEntry({ syncStatus: 'synced', ref: '1', paymentDate: '2026-06-01' }),
       makeEntry({ syncStatus: 'payment_confirmed', invoiceStatus: 'paid' }),
-      makeEntry({ syncStatus: 'client_assigned' }),
       makeEntry({ syncStatus: 'pending_sync' }),
       makeEntry({ syncStatus: 'sync_failed' }),
     ];
     const counts = getPaymentFilterCounts(entries);
-    expect(counts.all).toBe(5);
-    expect(counts.needs_action).toBe(4);
+    expect(counts.all).toBe(4);
+    expect(counts.needs_action).toBe(2);
     expect(counts.pending_sync).toBe(1);
     expect(counts.sync_failed).toBe(1);
-    expect(counts.awaiting_assign).toBe(1);
     expect(counts.completed).toBe(1);
+  });
+});
+
+describe('paymentNeedsAction', () => {
+  it('excludes pending sync entries waiting for upload', () => {
+    expect(paymentNeedsAction(makeEntry({ syncStatus: 'pending_sync' }))).toBe(false);
+  });
+
+  it('includes sync failed entries that need manual completion', () => {
+    expect(
+      paymentNeedsAction(makeEntry({ syncStatus: 'sync_failed', ref: '', paymentDate: '' }))
+    ).toBe(true);
   });
 });
 
@@ -154,10 +167,10 @@ describe('getPaymentActionHint', () => {
     expect(getPaymentActionHint(makeEntry({ syncStatus: 'synced' }))).toBe('Confirmar pago →');
   });
 
-  it('suggests assign when confirmed', () => {
+  it('returns null when payment is confirmed', () => {
     expect(
       getPaymentActionHint(makeEntry({ syncStatus: 'payment_confirmed', invoiceStatus: 'paid' }))
-    ).toBe('Asociar cliente →');
+    ).toBeNull();
   });
 
   it('suggests complete data on failed parse', () => {

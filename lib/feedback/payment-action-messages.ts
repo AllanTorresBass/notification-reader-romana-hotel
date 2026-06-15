@@ -41,31 +41,3 @@ export function formatConfirmPaymentMessages(
       : copy.pagos.actions.confirm.completedMessageGeneric,
   };
 }
-
-export function formatAssignClientMessages(
-  entry: PaymentRegisterCacheEntry | null,
-  status: ActionDispatchStatus,
-  clientName?: string
-): { title: string; message: string } {
-  const summary = paymentSummary(entry);
-  const client = clientName?.trim() || copy.pagos.actions.assign.clientFallback;
-
-  if (status === 'already_done') {
-    return {
-      title: copy.pagos.actions.assign.alreadyTitle,
-      message: copy.pagos.actions.assign.alreadyMessage(client, summary),
-    };
-  }
-
-  if (status === 'queued') {
-    return {
-      title: copy.pagos.actions.assign.queuedTitle,
-      message: copy.pagos.actions.assign.queuedMessage(client, summary),
-    };
-  }
-
-  return {
-    title: copy.pagos.actions.assign.completedTitle,
-    message: copy.pagos.actions.assign.completedMessage(client, summary),
-  };
-}

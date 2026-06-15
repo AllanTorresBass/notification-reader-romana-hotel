@@ -13,12 +13,11 @@ export function formatSyncStatusLabel(
   syncStatus: string,
   invoiceStatus: 'pending' | 'paid' | null
 ): string {
-  if (syncStatus === 'client_assigned') return copy.syncStatus.clientAssigned;
   if (syncStatus === 'payment_confirmed' || invoiceStatus === 'paid') {
     return copy.syncStatus.paymentConfirmed;
   }
-  if (syncStatus === 'synced' || invoiceStatus === 'pending') {
-    return copy.syncStatus.invoicePending;
+  if (syncStatus === 'synced') {
+    return copy.syncStatus.synced;
   }
   if (syncStatus === 'pending_sync') return copy.syncStatus.pendingSync;
   if (syncStatus === 'sync_failed') return copy.syncStatus.syncFailed;
@@ -29,7 +28,6 @@ export function getSyncStepIndex(
   syncStatus: string,
   invoiceStatus: 'pending' | 'paid' | null
 ): number {
-  if (syncStatus === 'client_assigned') return 4;
   if (syncStatus === 'payment_confirmed' || invoiceStatus === 'paid') return 3;
   if (syncStatus === 'synced') return 2;
   if (syncStatus === 'pending_sync' || syncStatus === 'sync_failed') return 1;

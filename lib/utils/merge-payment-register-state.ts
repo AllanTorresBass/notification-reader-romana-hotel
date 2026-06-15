@@ -5,7 +5,6 @@ const SYNC_RANK: Record<SyncStatus, number> = {
   pending_sync: 1,
   synced: 2,
   payment_confirmed: 3,
-  client_assigned: 4,
 };
 
 /** Keep the most advanced invoice status when merging local cache with remote pull. */
@@ -18,10 +17,7 @@ export function mergeInvoiceStatus(
   return remote ?? local ?? null;
 }
 
-/**
- * Never downgrade sync progress on pull — e.g. keep payment_confirmed when the
- * register list still shows invoice pending/null after a local confirm.
- */
+/** Never downgrade sync progress on pull. */
 export function mergeSyncStatus(
   existing: SyncStatus,
   remoteInvoiceStatus: PaymentRegisterInvoiceStatus
@@ -33,7 +29,7 @@ export function mergeSyncStatus(
   let remoteDerived: SyncStatus = existing;
 
   if (remoteInvoiceStatus === 'paid') {
-    remoteDerived = existing === 'client_assigned' ? 'client_assigned' : 'payment_confirmed';
+    remoteDerived = 'payment_confirmed';
   } else if (existing === 'pending_sync' || existing === 'sync_failed') {
     remoteDerived = existing;
   } else {
@@ -43,10 +39,9 @@ export function mergeSyncStatus(
   return SYNC_RANK[remoteDerived] > SYNC_RANK[existing] ? remoteDerived : existing;
 }
 
-export function canAssignClientToPayment(entry: {
+export function isPaymentWorkflowComplete(entry: {
   syncStatus: SyncStatus;
   invoiceStatus: PaymentRegisterInvoiceStatus;
 }): boolean {
-  if (entry.syncStatus === 'client_assigned') return false;
   return entry.syncStatus === 'payment_confirmed' || entry.invoiceStatus === 'paid';
 }

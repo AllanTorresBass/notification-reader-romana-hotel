@@ -10,7 +10,7 @@ import type {
   PaymentStatusFilter,
 } from '@/types/payment/payment-register-cache.types';
 
-interface PaymentFilterBarProps {
+export interface PaymentFilterBarProps {
   status: PaymentStatusFilter;
   search: string;
   counts: PaymentRegisterFilterCounts | undefined;
@@ -19,30 +19,25 @@ interface PaymentFilterBarProps {
   onSearchChange: (search: string) => void;
 }
 
-type FilterLabelKey =
-  | 'all'
-  | 'needsAction'
-  | 'pendingSync'
-  | 'syncFailed'
-  | 'awaitingAssign'
-  | 'completed';
+type FilterLabelKey = 'all' | 'needsAction' | 'pendingSync' | 'syncFailed' | 'completed';
 
 const FILTER_OPTIONS: { value: PaymentStatusFilter; labelKey: FilterLabelKey }[] = [
   { value: 'all', labelKey: 'all' },
   { value: 'needs_action', labelKey: 'needsAction' },
   { value: 'pending_sync', labelKey: 'pendingSync' },
   { value: 'sync_failed', labelKey: 'syncFailed' },
-  { value: 'awaiting_assign', labelKey: 'awaitingAssign' },
   { value: 'completed', labelKey: 'completed' },
 ];
 
 function formatChipLabel(
   value: PaymentStatusFilter,
   labelKey: FilterLabelKey,
-  counts: PaymentRegisterFilterCounts | undefined
+  counts: PaymentRegisterFilterCounts | undefined,
+  search: string
 ): string {
   const base = copy.pagos.filters[labelKey];
-  if (!counts || value === 'all') return base;
+  const hideCounts = !counts || value === 'all' || search.trim().length > 0;
+  if (hideCounts) return base;
   const count = counts[value];
   return count > 0 ? `${base} (${count})` : base;
 }
@@ -57,11 +52,14 @@ export function PaymentFilterBar({
 }: PaymentFilterBarProps) {
   const chipOptions = FILTER_OPTIONS.map(({ value, labelKey }) => ({
     value,
-    label: formatChipLabel(value, labelKey, counts),
+    label: formatChipLabel(value, labelKey, counts, search),
   }));
 
-  const activeFilterLabel = chipOptions.find((o) => o.value === status)?.label ?? copy.pagos.filters.all;
+  const activeFilterLabel =
+    chipOptions.find((o) => o.value === status)?.label.replace(/\s\(\d+\)$/, '') ??
+    copy.pagos.filters.all;
   const total = counts?.all ?? filteredTotal;
+  const isFiltering = status !== 'all' || search.trim().length > 0;
 
   return (
     <View style={styles.container}>
@@ -77,9 +75,7 @@ export function PaymentFilterBar({
 
       <ThemedText variant="caption" muted style={styles.summary}>
         {copy.pagos.filters.resultCount(filteredTotal, total)}
-        {status !== 'all' || search.trim()
-          ? ` · ${copy.pagos.filters.activeFilter(activeFilterLabel.replace(/\s\(\d+\)$/, ''))}`
-          : ''}
+        {isFiltering ? ` · ${copy.pagos.filters.activeFilter(activeFilterLabel)}` : ''}
       </ThemedText>
     </View>
   );

@@ -8,7 +8,6 @@ import { copy } from '@/constants/copy';
 import { useApiAuthStatus, useIsApiAuthenticated, useLastSyncError } from '@/hooks/use-api-auth';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import {
-  useAssignClientMutation,
   useConfirmPaymentMutation,
   useManualRegisterMutation,
   usePaymentFilterCountsQuery,
@@ -20,7 +19,6 @@ import {
 import { useNotificationShadeSync } from '@/hooks/use-notification-shade-sync';
 import { uxLogger } from '@/lib/logger';
 import {
-  formatAssignClientOutcome,
   formatConfirmPaymentOutcome,
   formatErrorOutcome,
   formatPullSyncOutcome,
@@ -45,7 +43,7 @@ import type {
   PaymentStatusFilter,
 } from '@/types/payment/payment-register-cache.types';
 
-const DEFAULT_STATUS_FILTER: PaymentStatusFilter = 'needs_action';
+const DEFAULT_STATUS_FILTER: PaymentStatusFilter = 'all';
 
 export function usePaymentFeedScreen() {
   const router = useRouter();
@@ -66,14 +64,11 @@ export function usePaymentFeedScreen() {
   const [refreshBanner, setRefreshBanner] = useState<BannerItem | null>(null);
   const [actionBanner, setActionBanner] = useState<BannerItem | null>(null);
   const [detailFeedback, setDetailFeedback] = useState<OperationOutcome | null>(null);
-  const [assigningClientId, setAssigningClientId] = useState<string | null>(null);
-  const [assignSheetResetToken, setAssignSheetResetToken] = useState(0);
   const cardOpenTimeRef = useRef<number | null>(null);
   const prevStatusFilterRef = useRef(statusFilter);
   const prevDebouncedSearchRef = useRef('');
 
   const detailRef = useRef<BottomSheet>(null);
-  const assignRef = useRef<BottomSheet>(null);
 
   const debouncedSearch = useDebouncedValue(searchInput, 300);
 
@@ -98,7 +93,6 @@ export function usePaymentFeedScreen() {
     usePaymentRegistersInfiniteQuery(filters);
   const { data: filterCounts } = usePaymentFilterCountsQuery();
   const confirmPayment = useConfirmPaymentMutation();
-  const assignClient = useAssignClientMutation();
   const manualRegister = useManualRegisterMutation();
   const queueRetry = useQueueRetryMutation();
   const { data: pendingLocalSync = 0 } = usePendingLocalSyncCountQuery();
@@ -113,7 +107,9 @@ export function usePaymentFeedScreen() {
   const filteredTotal = data?.pages[0]?.total ?? 0;
   const cacheEmpty = (filterCounts?.all ?? 0) === 0;
   const hasActiveFilter =
-    statusFilter !== DEFAULT_STATUS_FILTER || searchInput.trim().length > 0;
+    statusFilter !== 'all' || searchInput.trim().length > 0;
+  const showClearFiltersOnEmpty =
+    hasActiveFilter && filteredTotal === 0 && (filterCounts?.all ?? 0) > 0;
 
   const listRows = useMemo((): PaymentListRow[] => {
     const sections = groupPaymentRegistersByDate(entries);
@@ -241,7 +237,6 @@ export function usePaymentFeedScreen() {
   const openDetail = useCallback(
     (entry: PaymentRegisterCacheEntry) => {
       setDetailFeedback(null);
-      setAssigningClientId(null);
       setSelected(entry);
       cardOpenTimeRef.current = Date.now();
       const action = resolvePaymentAction(entry, { isAuthenticated });
@@ -262,22 +257,6 @@ export function usePaymentFeedScreen() {
     },
     [statusFilter, debouncedSearch, isAuthenticated]
   );
-
-  const resetAssignSheetDraft = useCallback(() => {
-    setAssignSheetResetToken((token) => token + 1);
-    setAssigningClientId(null);
-  }, []);
-
-  const resetPaymentWorkflow = useCallback(() => {
-    assignRef.current?.close();
-    detailRef.current?.close();
-    setSelected(null);
-    setDetailFeedback(null);
-    resetAssignSheetDraft();
-    void queryClient.invalidateQueries({ queryKey: queryKeys.clients.all });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.lists() });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.paymentRegisters.filterCounts() });
-  }, [queryClient, resetAssignSheetDraft]);
 
   const refresh = useCallback(async () => {
     try {
@@ -335,16 +314,6 @@ export function usePaymentFeedScreen() {
     });
   }, [selected, confirmPayment, statusFilter, debouncedSearch]);
 
-  const handleAssignClient = useCallback(() => {
-    detailRef.current?.close();
-    assignRef.current?.expand();
-  }, []);
-
-  const handleBackFromAssign = useCallback(() => {
-    assignRef.current?.close();
-    detailRef.current?.expand();
-  }, []);
-
   const handleCompleteManual = useCallback(() => {
     if (!selected) return;
     detailRef.current?.close();
@@ -356,46 +325,6 @@ export function usePaymentFeedScreen() {
     setManualTime(selected.paymentTime);
     setShowManual(true);
   }, [selected]);
-
-  const handleAssign = useCallback(
-    (clientId: string, clientName: string) => {
-      if (!selected) return;
-      setAssigningClientId(clientId);
-      assignClient.mutate(
-        { localId: selected.localId, clientId, clientName },
-        {
-          onSuccess: (result) => {
-            const outcome = formatAssignClientOutcome(result, clientName);
-            reportOutcomeWithPolicy(outcome, { anchor: 'detail-sheet' });
-            showActionBanner(outcome);
-            resetAssignSheetDraft();
-
-            if (result.status === 'completed' || result.status === 'already_done') {
-              resetPaymentWorkflow();
-              return;
-            }
-
-            assignRef.current?.close();
-            if (result.entry) {
-              setSelected(result.entry);
-              detailRef.current?.expand();
-            }
-          },
-          onError: (error) => {
-            setAssigningClientId(null);
-            const outcome = formatErrorOutcome(
-              'assign_client',
-              error,
-              'No se pudo asociar el cliente.'
-            );
-            showActionBanner(outcome);
-            reportOutcomeWithPolicy(outcome, { anchor: 'detail-sheet' });
-          },
-        }
-      );
-    },
-    [selected, assignClient, showActionBanner, resetAssignSheetDraft, resetPaymentWorkflow]
-  );
 
   const submitManual = useCallback(() => {
     try {
@@ -434,6 +363,7 @@ export function usePaymentFeedScreen() {
     entries,
     listRows,
     hasActiveFilter,
+    showClearFiltersOnEmpty,
     clearFilters,
     statusFilter,
     searchInput,
@@ -458,17 +388,10 @@ export function usePaymentFeedScreen() {
     setShowManual,
     manualRegister,
     detailRef,
-    assignRef,
     selected,
     detailFeedback,
     handleConfirmPayment,
-    handleAssignClient,
     handleCompleteManual,
     confirmPayment,
-    handleAssign,
-    handleBackFromAssign,
-    assignClient,
-    assigningClientId,
-    assignSheetResetToken,
   };
 }
