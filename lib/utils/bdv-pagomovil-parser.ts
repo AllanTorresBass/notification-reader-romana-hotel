@@ -1,7 +1,9 @@
 import type { PagomovilParseInput, ParsedPagomovil, ParseConfidence } from '@/types/payment/parsed-payment.types';
+import type { PaymentDateSource } from '@la-romana/payment-datetime';
 import {
   instantToCaracasDateKey,
   instantToCaracasWallTime,
+  normalizePaymentTime,
 } from '@/lib/utils/format-payment-datetime';
 
 const PAGOMOVIL_TITLE = /pagom[oó]vil/i;
@@ -69,16 +71,13 @@ export function parseVenezuelanDate(raw: string): string {
 export function postTimeToPaymentFields(postTime: number): {
   paymentDate: string;
   paymentTime: string;
+  dateSource: PaymentDateSource;
 } {
   return {
     paymentDate: instantToCaracasDateKey(postTime),
     paymentTime: instantToCaracasWallTime(postTime),
+    dateSource: 'post_time',
   };
-}
-
-function normalizeTime(raw: string): string {
-  const trimmed = raw.trim();
-  return trimmed.length === 4 ? `0${trimmed}` : trimmed;
 }
 
 export function parsePagomovilNotification(
@@ -93,6 +92,7 @@ export function parsePagomovilNotification(
     ref: '',
     paymentDate: '',
     paymentTime: '',
+    dateSource: 'unknown',
     confidence: 'failed',
   };
 
@@ -104,12 +104,15 @@ export function parsePagomovilNotification(
   if (typeB) {
     let confidence: ParseConfidence = 'high';
     let paymentDate = '';
+    let dateSource: PaymentDateSource = 'notification_text';
     try {
       paymentDate = parseVenezuelanDate(typeB[4]);
     } catch {
       confidence = 'partial';
       if (postTime) {
-        paymentDate = postTimeToPaymentFields(postTime).paymentDate;
+        const fallback = postTimeToPaymentFields(postTime);
+        paymentDate = fallback.paymentDate;
+        dateSource = fallback.dateSource;
       }
     }
     return {
@@ -118,14 +121,19 @@ export function parsePagomovilNotification(
       mobile: typeB[2].trim(),
       ref: typeB[3].trim(),
       paymentDate,
-      paymentTime: normalizeTime(typeB[5]),
+      paymentTime: normalizePaymentTime(typeB[5]),
+      dateSource,
       confidence,
     };
   }
 
   const typeA = text.match(TYPE_A_RE);
   if (typeA) {
-    const fallback = postTime ? postTimeToPaymentFields(postTime) : { paymentDate: '', paymentTime: '' };
+    const fallback = postTime ? postTimeToPaymentFields(postTime) : {
+      paymentDate: '',
+      paymentTime: '',
+      dateSource: 'unknown' as PaymentDateSource,
+    };
     return {
       name: typeA[1].trim(),
       pago: normalizePagoAmount(typeA[2]),
@@ -133,6 +141,7 @@ export function parsePagomovilNotification(
       ref: typeA[3].trim(),
       paymentDate: fallback.paymentDate,
       paymentTime: fallback.paymentTime,
+      dateSource: fallback.dateSource,
       confidence: postTime ? 'high' : 'partial',
     };
   }

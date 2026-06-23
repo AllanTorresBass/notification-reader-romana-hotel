@@ -5,17 +5,23 @@ import {
   STORAGE_VERSION,
   STORAGE_WRITE_DEBOUNCE_MS,
 } from '@/constants/storage-keys';
+import { tracePaymentDatePipeline } from '@/lib/diagnostics/payment-date-trace';
 import { BaseStorageRepository } from '@/lib/services/base/base-storage-repository';
 import { secureStorageClient } from '@/lib/storage/secure-storage-client';
 import { logger } from '@/lib/logger';
-import { paymentRegisterStoreEnvelopeSchema } from '@/types/payment/payment-register-cache.schemas';
+import {
+  paymentRegisterStoreEnvelopeSchema,
+  repairPaymentRegisterEntry,
+} from '@/types/payment/payment-register-cache.schemas';
 import { mergeInvoiceStatus, mergeSyncStatus } from '@/lib/utils/merge-payment-register-state';
 import { filterPaymentRegisters, getPaymentFilterCounts } from '@/lib/utils/filter-payment-registers';
 import {
   normalizePaymentDate,
   normalizePaymentTime,
-  parsePaymentCalendarDate,
+  resolveMergedPaymentDate,
+  resolveMergedPaymentTime,
 } from '@/lib/utils/format-payment-datetime';
+import type { PaymentDateSource } from '@la-romana/payment-datetime';
 import type {
   PaymentRegisterCacheEntry,
   PaymentRegisterFilterCounts,
@@ -28,42 +34,26 @@ function generateLocalId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
-function isRemoteOnlyEntry(entry: Pick<PaymentRegisterCacheEntry, 'notificationKey'>): boolean {
-  return entry.notificationKey.startsWith('remote-');
-}
-
-function resolveMergedPaymentDate(
-  existing: PaymentRegisterCacheEntry,
-  remoteDate: string
-): string {
-  const localKey = parsePaymentCalendarDate(existing.paymentDate);
-  const remoteKey = normalizePaymentDate(remoteDate);
-
-  if (localKey && existing.paymentDate.trim() && !isRemoteOnlyEntry(existing)) {
-    return localKey;
+function normalizeDatePatch(
+  patch: Partial<Pick<PaymentRegisterCacheEntry, 'paymentDate' | 'paymentTime' | 'dateSource'>>
+): Partial<Pick<PaymentRegisterCacheEntry, 'paymentDate' | 'paymentTime' | 'dateSource'>> {
+  const normalized: Partial<Pick<PaymentRegisterCacheEntry, 'paymentDate' | 'paymentTime' | 'dateSource'>> = {
+    ...patch,
+  };
+  if (patch.paymentDate !== undefined) {
+    normalized.paymentDate = normalizePaymentDate(patch.paymentDate);
   }
-
-  return remoteKey || localKey || existing.paymentDate || '';
-}
-
-function resolveMergedPaymentTime(
-  existing: PaymentRegisterCacheEntry,
-  remoteTime: string
-): string {
-  const localTime = normalizePaymentTime(existing.paymentTime);
-  const remoteTimeKey = normalizePaymentTime(remoteTime);
-
-  if (localTime && existing.paymentTime.trim() && !isRemoteOnlyEntry(existing)) {
-    return localTime;
+  if (patch.paymentTime !== undefined) {
+    normalized.paymentTime = normalizePaymentTime(patch.paymentTime);
   }
-
-  return remoteTimeKey || localTime || existing.paymentTime || '';
+  return normalized;
 }
 
 export class PaymentRegisterCacheRepository extends BaseStorageRepository {
   private cache: PaymentRegisterCacheEntry[] | null = null;
   private keyIndex = new Map<string, PaymentRegisterCacheEntry>();
   private isHydrated = false;
+  private migrationPersisted = false;
 
   private async hydrate(): Promise<PaymentRegisterCacheEntry[]> {
     if (this.cache && this.isHydrated) {
@@ -87,9 +77,31 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
       return this.cache;
     }
 
-    this.cache = parsed.data.entries;
+    const repaired = parsed.data.entries.map(repairPaymentRegisterEntry);
+    this.cache = repaired;
     this.rebuildIndex();
     this.isHydrated = true;
+
+    const needsMigration =
+      parsed.data.version < STORAGE_VERSION || repaired.some((entry, index) => {
+        const raw = parsed.data.entries[index];
+        return (
+          entry.paymentDate !== raw.paymentDate ||
+          entry.paymentTime !== raw.paymentTime ||
+          entry.dateSource !== raw.dateSource
+        );
+      });
+
+    if (needsMigration && !this.migrationPersisted) {
+      this.migrationPersisted = true;
+      logger.info('Repairing payment register cache (date/time migration)', {
+        fromVersion: parsed.data.version,
+        toVersion: STORAGE_VERSION,
+        count: repaired.length,
+      });
+      await this.persistNow(repaired);
+    }
+
     return this.cache;
   }
 
@@ -107,7 +119,7 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
   }
 
   private async persistNow(entries: PaymentRegisterCacheEntry[]): Promise<void> {
-    const envelope = { version: STORAGE_VERSION as 1, entries };
+    const envelope = { version: STORAGE_VERSION as 2, entries };
     await secureStorageClient.setJson(STORAGE_KEYS.paymentRegisters, envelope);
     this.cache = entries;
     this.rebuildIndex();
@@ -117,6 +129,23 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
     this.scheduleDebouncedWrite(async () => {
       await this.persistNow(entries);
     }, STORAGE_WRITE_DEBOUNCE_MS);
+  }
+
+  async repairAllEntries(): Promise<number> {
+    const entries = await this.hydrate();
+    const repaired = entries.map(repairPaymentRegisterEntry);
+    const changed = repaired.filter(
+      (entry, index) =>
+        entry.paymentDate !== entries[index].paymentDate ||
+        entry.paymentTime !== entries[index].paymentTime
+    ).length;
+
+    if (changed > 0) {
+      await this.persistNow(repaired);
+      logger.info('Payment register cache repair sweep', { changed, total: repaired.length });
+    }
+
+    return changed;
   }
 
   async upsert(
@@ -141,6 +170,7 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
       lastSyncError?: string | null;
       failureClass?: PaymentRegisterCacheEntry['failureClass'];
       failureStage?: PaymentRegisterCacheEntry['failureStage'];
+      dateSource?: PaymentDateSource;
     }
   ): Promise<PaymentRegisterCacheEntry> {
     const entries = await this.hydrate();
@@ -157,6 +187,7 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
       ref: input.ref,
       paymentDate: normalizePaymentDate(input.paymentDate),
       paymentTime: normalizePaymentTime(input.paymentTime),
+      dateSource: input.dateSource ?? existing?.dateSource ?? 'unknown',
       notificationKey: input.notificationKey,
       notificationId: input.notificationId,
       invoiceStatus: input.invoiceStatus ?? existing?.invoiceStatus ?? null,
@@ -191,6 +222,7 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
         | 'ref'
         | 'paymentDate'
         | 'paymentTime'
+        | 'dateSource'
         | 'name'
         | 'pago'
         | 'mobile'
@@ -205,7 +237,7 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
 
     const updated: PaymentRegisterCacheEntry = {
       ...entries[index],
-      ...patch,
+      ...normalizeDatePatch(patch),
       updatedAt: Date.now(),
     };
     const merged = [...entries];
@@ -266,11 +298,28 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
     let imported = 0;
 
     for (const remote of remoteEntries) {
+      const normalizedRemoteDate = normalizePaymentDate(remote.paymentDate);
+      const normalizedRemoteTime = normalizePaymentTime(remote.paymentTime);
+
       const existing =
         byRemoteId.get(remote.id) ??
         (remote.notificationKey ? this.keyIndex.get(remote.notificationKey) : undefined);
 
       if (existing) {
+        const mergedDate = resolveMergedPaymentDate(existing, remote.paymentDate);
+        const mergedTime = resolveMergedPaymentTime(existing, remote.paymentTime);
+
+        tracePaymentDatePipeline({
+          stage: 'merge',
+          notificationKey: existing.notificationKey,
+          remoteId: remote.id,
+          rawDate: remote.paymentDate,
+          rawTime: remote.paymentTime,
+          normalizedDate: mergedDate,
+          normalizedTime: mergedTime,
+          policy: existing.dateSource,
+        });
+
         const invoiceStatus = mergeInvoiceStatus(existing.invoiceStatus, remote.invoiceStatus);
         await this.updateByLocalId(existing.localId, {
           remoteRegisterId: remote.id,
@@ -280,13 +329,26 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
           pago: remote.pago,
           mobile: remote.mobile,
           ref: remote.ref || existing.ref,
-          paymentDate: resolveMergedPaymentDate(existing, remote.paymentDate),
-          paymentTime: resolveMergedPaymentTime(existing, remote.paymentTime),
+          paymentDate: mergedDate,
+          paymentTime: mergedTime,
+          dateSource:
+            existing.dateSource === 'notification_text' || existing.dateSource === 'manual'
+              ? existing.dateSource
+              : 'remote_api',
           syncStatus: mergeSyncStatus(existing.syncStatus, remote.invoiceStatus),
         });
         updated += 1;
         continue;
       }
+
+      tracePaymentDatePipeline({
+        stage: 'api_pull',
+        remoteId: remote.id,
+        rawDate: remote.paymentDate,
+        rawTime: remote.paymentTime,
+        normalizedDate: normalizedRemoteDate,
+        normalizedTime: normalizedRemoteTime,
+      });
 
       const notificationKey = remote.notificationKey ?? `remote-${remote.id}`;
       const syncStatus: SyncStatus =
@@ -299,8 +361,9 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
         pago: remote.pago,
         mobile: remote.mobile,
         ref: remote.ref,
-        paymentDate: normalizePaymentDate(remote.paymentDate),
-        paymentTime: normalizePaymentTime(remote.paymentTime),
+        paymentDate: normalizedRemoteDate,
+        paymentTime: normalizedRemoteTime,
+        dateSource: 'remote_api',
         notificationKey,
         notificationId: notificationKey,
         invoiceStatus: remote.invoiceStatus,
@@ -312,7 +375,7 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
       imported += 1;
     }
 
-    if (imported > 0) {
+    if (imported > 0 || updated > 0) {
       await this.flush();
     }
 

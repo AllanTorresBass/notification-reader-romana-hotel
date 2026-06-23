@@ -15,6 +15,7 @@ const baseEntry: PaymentRegisterCacheEntry = {
   ref: '222917745208',
   paymentDate: '2026-06-02',
   paymentTime: '22:29',
+  dateSource: 'notification_text',
   notificationKey: 'com.bancodevenezuela.bdvdigital::bdv-key-1',
   notificationId: 'notif-1',
   invoiceStatus: null,

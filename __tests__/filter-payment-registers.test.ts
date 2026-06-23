@@ -20,6 +20,7 @@ function makeEntry(
     ref: '123456',
     paymentDate: '2026-06-01',
     paymentTime: '10:30',
+    dateSource: 'notification_text',
     notificationKey: 'key-1',
     notificationId: 'notif-1',
     invoiceStatus: null,

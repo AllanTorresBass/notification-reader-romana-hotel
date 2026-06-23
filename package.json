@@ -8,6 +8,7 @@
     "@expo-google-fonts/playfair-display": "^0.4.2",
     "@gorhom/bottom-sheet": "^5.2.14",
     "@hookform/resolvers": "^5.4.0",
+    "@la-romana/payment-datetime": "file:./packages/payment-datetime",
     "@shopify/flash-list": "2.0.2",
     "@tanstack/react-query": "^5.101.0",
     "burnt": "^0.13.0",
@@ -70,6 +71,7 @@
     "postinstall": "patch-package",
     "verify:api": "npx tsx scripts/verify-la-romana-api.ts",
     "verify:api:live": "npm run verify:api",
+    "verify:payment-dates": "npx tsx scripts/verify-payment-dates.ts",
     "list:payments": "npx tsx scripts/list-payments.ts"
   },
   "private": true

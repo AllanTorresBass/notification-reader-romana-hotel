@@ -1,4 +1,5 @@
 import type { PaymentFailureClass, PaymentFailureStage } from '@/types/payment/payment-sync-failure.types';
+import type { PaymentDateSource } from '@la-romana/payment-datetime';
 
 export type SyncStatus =
   | 'pending_sync'
@@ -18,6 +19,7 @@ export interface PaymentRegisterCacheEntry {
   ref: string;
   paymentDate: string;
   paymentTime: string;
+  dateSource: PaymentDateSource;
   notificationKey: string;
   notificationId: string;
   invoiceStatus: PaymentRegisterInvoiceStatus;
@@ -86,6 +88,6 @@ export interface PaymentSyncQueueEnvelope {
 }
 
 export interface PaymentRegisterStoreEnvelope {
-  version: 1;
+  version: 1 | 2;
   entries: PaymentRegisterCacheEntry[];
 }
