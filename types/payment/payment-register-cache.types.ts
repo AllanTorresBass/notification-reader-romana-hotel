@@ -41,6 +41,14 @@ export type PaymentStatusFilter =
 export interface PaymentRegisterListFilters {
   status?: PaymentStatusFilter;
   search?: string;
+  /** Inclusive YYYY-MM-DD */
+  dateFrom?: string;
+  /** Inclusive YYYY-MM-DD */
+  dateTo?: string;
+  /** Inclusive HH:mm (24h) */
+  timeFrom?: string;
+  /** Inclusive HH:mm (24h) */
+  timeTo?: string;
 }
 
 export interface PaymentRegisterFilterCounts {

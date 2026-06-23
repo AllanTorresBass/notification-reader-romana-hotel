@@ -17,7 +17,7 @@ export function useNotificationShadeSync() {
 
   const syncFromShade = useCallback(async (): Promise<NotificationShadeSyncResult> => {
     if (Platform.OS !== 'android') {
-      return { scanned: 0, stored: 0, ingested: 0, listenerConnected: false };
+      return { scanned: 0, stored: 0, ingested: 0, listenerConnected: false, accessGranted: false };
     }
     const result = await syncNotificationsFromShade({
       allowedPackages: [...ALLOWED_PACKAGES],

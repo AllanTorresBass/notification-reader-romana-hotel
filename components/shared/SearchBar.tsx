@@ -5,6 +5,7 @@ import { TextInput } from '@/components/ui/TextInput';
 import { spacing } from '@/constants/theme';
 import { MIN_TOUCH_TARGET, touchTargetStyle } from '@/constants/touch';
 import { useThemeColors } from '@/hooks/use-theme-colors';
+import { hasText, trimText } from '@/lib/utils/safe-text';
 
 interface SearchBarProps {
   value: string;
@@ -22,19 +23,20 @@ export function SearchBar({
   clearAccessibilityLabel,
 }: SearchBarProps) {
   const { colors } = useThemeColors();
+  const safeValue = trimText(value);
 
   return (
     <View style={styles.searchRow}>
       <Search color={colors.textMuted} size={18} style={styles.searchIcon} />
       <TextInput
-        value={value}
+        value={safeValue}
         onChangeText={onChangeText}
         placeholder={placeholder}
         accessibilityLabel={accessibilityLabel}
         style={styles.searchInput}
         returnKeyType="search"
       />
-      {value.length > 0 ? (
+      {safeValue.length > 0 ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={clearAccessibilityLabel}

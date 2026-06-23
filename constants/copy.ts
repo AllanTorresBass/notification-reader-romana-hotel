@@ -40,6 +40,17 @@ export const copy = {
       emptyTitle: 'Ningún pago coincide',
       emptyDescription: 'Prueba otro filtro o limpia la búsqueda.',
       clearFilters: 'Limpiar filtros',
+      advancedTitle: 'Fecha y hora',
+      dateLabel: 'Fecha del pago',
+      dateFromPlaceholder: 'Desde (AAAA-MM-DD)',
+      dateToPlaceholder: 'Hasta (AAAA-MM-DD)',
+      timeLabel: 'Hora del pago',
+      timeFromPlaceholder: 'Desde (HH:MM)',
+      timeToPlaceholder: 'Hasta (HH:MM)',
+      dateFilterActive: 'fecha',
+      timeFilterActive: 'hora',
+      searchFilterActive: 'búsqueda',
+      activeFilters: (labels: string[]) => `Filtros: ${labels.join(', ')}`,
     },
     detail: {
       selectPayment: 'Selecciona un pago',
@@ -180,7 +191,7 @@ export const copy = {
         'No hay notificaciones de Banco de Venezuela visibles en la barra de notificaciones.',
       serviceDownTitle: 'Lector de notificaciones inactivo',
       serviceDownMessage:
-        'Android no está entregando alertas a la app. Revisa permisos o reinicia el dispositivo.',
+        'Android no está entregando alertas a la app. En Ajustes, desactiva y vuelve a activar el acceso a notificaciones para esta app. En Xiaomi, también activa inicio automático y desactiva optimización de batería.',
       serviceDownShort: 'Activa el lector de notificaciones en Ajustes de Android.',
       rescanCompletedTitle: 'Reescaneo completado',
       rescanCompletedMessage: (scanned: number, ingested: number, paymentsCreated: number) => {

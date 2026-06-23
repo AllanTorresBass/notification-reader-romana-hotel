@@ -1,4 +1,8 @@
 import type { PagomovilParseInput, ParsedPagomovil, ParseConfidence } from '@/types/payment/parsed-payment.types';
+import {
+  instantToCaracasDateKey,
+  instantToCaracasWallTime,
+} from '@/lib/utils/format-payment-datetime';
 
 const PAGOMOVIL_TITLE = /pagom[oó]vil/i;
 const PAGOMOVIL_BODY = /recibiste un pagom[oó]vil/i;
@@ -66,10 +70,9 @@ export function postTimeToPaymentFields(postTime: number): {
   paymentDate: string;
   paymentTime: string;
 } {
-  const d = new Date(postTime);
   return {
-    paymentDate: d.toISOString().split('T')[0],
-    paymentTime: d.toTimeString().slice(0, 5),
+    paymentDate: instantToCaracasDateKey(postTime),
+    paymentTime: instantToCaracasWallTime(postTime),
   };
 }
 

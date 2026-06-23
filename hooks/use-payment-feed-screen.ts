@@ -29,7 +29,9 @@ import { reportOutcome, reportError, reportOutcomeWithPolicy } from '@/lib/feedb
 import { queryKeys } from '@/lib/query-keys';
 import { paymentSyncOrchestrator } from '@/lib/services/payments/PaymentSyncOrchestrator';
 import { normalizePagoAmount } from '@/lib/utils/bdv-pagomovil-parser';
-import { getPaymentActionHint, getPaymentActionKind, resolvePaymentAction } from '@/lib/utils/filter-payment-registers';
+import { normalizePaymentTime } from '@/lib/utils/format-payment-datetime';
+import { hasText, trimText } from '@/lib/utils/safe-text';
+import { getPaymentActionHint, getPaymentActionKind, hasActivePaymentFilters, resolvePaymentAction } from '@/lib/utils/filter-payment-registers';
 import { paymentSyncQueue } from '@/lib/services/sync/payment-sync-queue';
 import {
   flattenPaymentSections,
@@ -55,6 +57,10 @@ export function usePaymentFeedScreen() {
   const [showManual, setShowManual] = useState(false);
   const [statusFilter, setStatusFilter] = useState<PaymentStatusFilter>(DEFAULT_STATUS_FILTER);
   const [searchInput, setSearchInput] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [timeFrom, setTimeFrom] = useState('');
+  const [timeTo, setTimeTo] = useState('');
   const [manualName, setManualName] = useState('');
   const [manualPago, setManualPago] = useState('');
   const [manualMobile, setManualMobile] = useState('');
@@ -75,9 +81,13 @@ export function usePaymentFeedScreen() {
   const filters = useMemo<PaymentRegisterListFilters>(
     () => ({
       status: statusFilter,
-      search: debouncedSearch.trim() || undefined,
+      search: hasText(debouncedSearch) ? trimText(debouncedSearch) : undefined,
+      dateFrom: hasText(dateFrom) ? trimText(dateFrom) : undefined,
+      dateTo: hasText(dateTo) ? trimText(dateTo) : undefined,
+      timeFrom: hasText(timeFrom) ? normalizePaymentTime(trimText(timeFrom)) : undefined,
+      timeTo: hasText(timeTo) ? normalizePaymentTime(trimText(timeTo)) : undefined,
     }),
-    [statusFilter, debouncedSearch]
+    [statusFilter, debouncedSearch, dateFrom, dateTo, timeFrom, timeTo]
   );
 
   useFocusEffect(
@@ -85,6 +95,10 @@ export function usePaymentFeedScreen() {
       return () => {
         setStatusFilter(DEFAULT_STATUS_FILTER);
         setSearchInput('');
+        setDateFrom('');
+        setDateTo('');
+        setTimeFrom('');
+        setTimeTo('');
       };
     }, [])
   );
@@ -106,8 +120,14 @@ export function usePaymentFeedScreen() {
 
   const filteredTotal = data?.pages[0]?.total ?? 0;
   const cacheEmpty = (filterCounts?.all ?? 0) === 0;
-  const hasActiveFilter =
-    statusFilter !== 'all' || searchInput.trim().length > 0;
+  const hasActiveFilter = hasActivePaymentFilters({
+    status: statusFilter,
+    search: trimText(searchInput),
+    dateFrom: trimText(dateFrom),
+    dateTo: trimText(dateTo),
+    timeFrom: trimText(timeFrom),
+    timeTo: trimText(timeTo),
+  });
   const showClearFiltersOnEmpty =
     hasActiveFilter && filteredTotal === 0 && (filterCounts?.all ?? 0) > 0;
 
@@ -149,7 +169,7 @@ export function usePaymentFeedScreen() {
   useEffect(() => {
     if (prevDebouncedSearchRef.current === debouncedSearch) return;
     uxLogger.event('payment_search', {
-      queryLength: debouncedSearch.trim().length,
+      queryLength: trimText(debouncedSearch).length,
       resultCount: filteredTotal,
     });
     prevDebouncedSearchRef.current = debouncedSearch;
@@ -228,6 +248,10 @@ export function usePaymentFeedScreen() {
   const clearFilters = useCallback(() => {
     setStatusFilter('all');
     setSearchInput('');
+    setDateFrom('');
+    setDateTo('');
+    setTimeFrom('');
+    setTimeTo('');
   }, []);
 
   const openManualRegister = useCallback(() => {
@@ -248,7 +272,7 @@ export function usePaymentFeedScreen() {
           hadRemoteId: Boolean(entry.remoteRegisterId),
           hadActionHint: Boolean(action.hint),
           actionHintKind: getPaymentActionKind(entry, { isAuthenticated }),
-          filterActive: statusFilter !== 'all' || Boolean(debouncedSearch.trim()),
+          filterActive: statusFilter !== 'all' || hasText(debouncedSearch),
           activeFilter: statusFilter,
           queuePendingForEntry,
         });
@@ -298,7 +322,7 @@ export function usePaymentFeedScreen() {
         if (result.status === 'completed' && cardOpenTimeRef.current) {
           uxLogger.event('payment_confirm_from_filter', {
             durationMs: Date.now() - cardOpenTimeRef.current,
-            filterActive: statusFilter !== 'all' || Boolean(debouncedSearch.trim()),
+            filterActive: statusFilter !== 'all' || hasText(debouncedSearch),
           });
         }
       },
@@ -366,9 +390,17 @@ export function usePaymentFeedScreen() {
     showClearFiltersOnEmpty,
     clearFilters,
     statusFilter,
-    searchInput,
+    searchInput: searchInput ?? '',
+    dateFrom: dateFrom ?? '',
+    dateTo: dateTo ?? '',
+    timeFrom: timeFrom ?? '',
+    timeTo: timeTo ?? '',
     setStatusFilter,
     setSearchInput,
+    setDateFrom,
+    setDateTo,
+    setTimeFrom,
+    setTimeTo,
     filterCounts,
     filteredTotal,
     openDetail,

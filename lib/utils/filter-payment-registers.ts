@@ -1,4 +1,10 @@
-import { formatPaymentDate, normalizePaymentTime } from '@/lib/utils/format-payment-datetime';
+import {
+  formatPaymentDate,
+  getEntryCalendarDateKey,
+  normalizePaymentTime,
+  timeToMinutes,
+} from '@/lib/utils/format-payment-datetime';
+import { hasText, trimText } from '@/lib/utils/safe-text';
 import { isPaymentWorkflowComplete } from '@/lib/utils/merge-payment-register-state';
 import { resolvePaymentAction } from '@/lib/utils/resolve-payment-action';
 import type {
@@ -75,15 +81,66 @@ function matchesSearch(entry: PaymentRegisterCacheEntry, search: string): boolea
   return haystack.includes(searchNormalized);
 }
 
+function matchesDateRange(
+  entry: PaymentRegisterCacheEntry,
+  dateFrom?: string,
+  dateTo?: string
+): boolean {
+  if (!dateFrom && !dateTo) return true;
+
+  const key = getEntryCalendarDateKey(entry);
+  if (!key) return false;
+  if (dateFrom && key < dateFrom) return false;
+  if (dateTo && key > dateTo) return false;
+  return true;
+}
+
+function matchesTimeRange(
+  entry: PaymentRegisterCacheEntry,
+  timeFrom?: string,
+  timeTo?: string
+): boolean {
+  if (!timeFrom && !timeTo) return true;
+
+  const minutes = timeToMinutes(entry.paymentTime);
+  if (minutes == null) return false;
+
+  const fromMinutes = timeFrom ? timeToMinutes(timeFrom) : null;
+  const toMinutes = timeTo ? timeToMinutes(timeTo) : null;
+  if (fromMinutes != null && minutes < fromMinutes) return false;
+  if (toMinutes != null && minutes > toMinutes) return false;
+  return true;
+}
+
+export function hasActivePaymentFilters(filters: PaymentRegisterListFilters = {}): boolean {
+  const status = filters.status ?? 'all';
+  return (
+    status !== 'all' ||
+    hasText(filters.search) ||
+    hasText(filters.dateFrom) ||
+    hasText(filters.dateTo) ||
+    hasText(filters.timeFrom) ||
+    hasText(filters.timeTo)
+  );
+}
+
 export function filterPaymentRegisters(
   entries: PaymentRegisterCacheEntry[],
   filters: PaymentRegisterListFilters = {}
 ): PaymentRegisterCacheEntry[] {
   const status = filters.status ?? 'all';
+  const dateFrom = hasText(filters.dateFrom) ? trimText(filters.dateFrom) : undefined;
+  const dateTo = hasText(filters.dateTo) ? trimText(filters.dateTo) : undefined;
+  const timeFrom = hasText(filters.timeFrom)
+    ? normalizePaymentTime(trimText(filters.timeFrom))
+    : undefined;
+  const timeTo = hasText(filters.timeTo) ? normalizePaymentTime(trimText(filters.timeTo)) : undefined;
 
   return entries.filter((entry) => {
     if (!matchesStatusFilter(entry, status)) return false;
-    if (filters.search && !matchesSearch(entry, filters.search)) return false;
+    if (hasText(filters.search) && !matchesSearch(entry, trimText(filters.search))) return false;
+    if (!matchesDateRange(entry, dateFrom, dateTo)) return false;
+    if (!matchesTimeRange(entry, timeFrom, timeTo)) return false;
     return true;
   });
 }

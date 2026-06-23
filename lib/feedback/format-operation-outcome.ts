@@ -173,7 +173,15 @@ export function formatShadeSyncOutcome(
   result: NotificationShadeSyncResult,
   options?: { includeSync?: boolean }
 ): OperationOutcome {
-  if (!result.listenerConnected) {
+  if (!result.accessGranted) {
+    return outcome(
+      'shade_sync',
+      'failed',
+      fb.notifications.serviceDownTitle,
+      fb.notifications.serviceDownShort
+    );
+  }
+  if (!result.listenerConnected && result.scanned === 0 && result.ingested === 0) {
     return outcome(
       'shade_sync',
       'failed',
@@ -235,12 +243,20 @@ export function formatRescanBdvOutcome(input: {
   shade: NotificationShadeSyncResult;
   syncCreated: number;
 }): OperationOutcome {
-  if (!input.shade.listenerConnected) {
+  if (!input.shade.accessGranted) {
     return outcome(
       'rescan_bdv',
       'failed',
       fb.notifications.serviceDownTitle,
       fb.notifications.serviceDownShort
+    );
+  }
+  if (!input.shade.listenerConnected && input.shade.scanned === 0 && input.shade.ingested === 0) {
+    return outcome(
+      'rescan_bdv',
+      'failed',
+      fb.notifications.serviceDownTitle,
+      fb.notifications.serviceDownMessage
     );
   }
   if (input.shade.scanned === 0) {

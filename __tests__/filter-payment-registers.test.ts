@@ -35,18 +35,26 @@ function makeEntry(
 
 describe('filterPaymentRegisters', () => {
   const entries = [
-    makeEntry({ localId: '1', syncStatus: 'synced', ref: '111', paymentDate: '2026-06-01' }),
+    makeEntry({ localId: '1', syncStatus: 'synced', ref: '111', paymentDate: '2026-06-01', paymentTime: '10:30' }),
     makeEntry({
       localId: '2',
       syncStatus: 'payment_confirmed',
       invoiceStatus: 'paid',
       ref: '222',
       paymentDate: '2026-06-02',
+      paymentTime: '15:45',
     }),
-    makeEntry({ localId: '3', syncStatus: 'payment_confirmed', invoiceStatus: 'paid', name: 'Ana' }),
-    makeEntry({ localId: '4', syncStatus: 'pending_sync' }),
-    makeEntry({ localId: '5', syncStatus: 'sync_failed', ref: '', paymentDate: '' }),
-    makeEntry({ localId: '6', mobile: '04249876543', pago: '25000.00' }),
+    makeEntry({ localId: '3', syncStatus: 'payment_confirmed', invoiceStatus: 'paid', name: 'Ana', paymentDate: '2026-06-01', paymentTime: '09:15' }),
+    makeEntry({ localId: '4', syncStatus: 'pending_sync', paymentDate: '2026-06-03', paymentTime: '11:00' }),
+    makeEntry({
+      localId: '5',
+      syncStatus: 'sync_failed',
+      ref: '',
+      paymentDate: '',
+      paymentTime: '',
+      createdAt: new Date('2026-05-01T12:00:00').getTime(),
+    }),
+    makeEntry({ localId: '6', mobile: '04249876543', pago: '25000.00', paymentDate: '2026-05-28', paymentTime: '18:20' }),
   ];
 
   it('returns all entries when filter is all', () => {
@@ -116,6 +124,42 @@ describe('filterPaymentRegisters', () => {
 
   it('ignores empty search', () => {
     expect(filterPaymentRegisters(entries, { search: '   ' })).toHaveLength(6);
+  });
+
+  it('filters by dateFrom', () => {
+    const result = filterPaymentRegisters(entries, { dateFrom: '2026-06-02' });
+    expect(result.map((entry) => entry.localId)).toEqual(['2', '4']);
+  });
+
+  it('filters by dateTo', () => {
+    const result = filterPaymentRegisters(entries, { dateTo: '2026-06-01' });
+    expect(result.map((entry) => entry.localId).sort()).toEqual(['1', '3', '5', '6']);
+  });
+
+  it('filters by date range', () => {
+    const result = filterPaymentRegisters(entries, {
+      dateFrom: '2026-06-01',
+      dateTo: '2026-06-02',
+    });
+    expect(result.map((entry) => entry.localId).sort()).toEqual(['1', '2', '3']);
+  });
+
+  it('filters by timeFrom', () => {
+    const result = filterPaymentRegisters(entries, { timeFrom: '11:00' });
+    expect(result.map((entry) => entry.localId)).toEqual(['2', '4', '6']);
+  });
+
+  it('filters by time range', () => {
+    const result = filterPaymentRegisters(entries, {
+      timeFrom: '09:00',
+      timeTo: '11:00',
+    });
+    expect(result.map((entry) => entry.localId)).toEqual(['1', '3', '4']);
+  });
+
+  it('excludes entries without time when time filter is active', () => {
+    const result = filterPaymentRegisters(entries, { timeFrom: '09:00' });
+    expect(result.map((entry) => entry.localId)).not.toContain('5');
   });
 });
 
