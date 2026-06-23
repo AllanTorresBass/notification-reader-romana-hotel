@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { repairPaymentDateTimeFields } from '@la-romana/payment-datetime';
+import type { PaymentDateSource } from '@la-romana/payment-datetime';
+import type { PaymentRegisterCacheEntry } from '@/types/payment/payment-register-cache.types';
 
 const paymentFailureClassSchema = z.enum([
   'parse_failed',
@@ -22,10 +25,28 @@ const syncStatusValues = [
   'sync_failed',
 ] as const;
 
+const paymentDateSourceSchema = z.enum([
+  'notification_text',
+  'post_time',
+  'manual',
+  'remote_api',
+  'unknown',
+]);
+
 export const syncStatusSchema = z.preprocess((value) => {
   if (value === 'client_assigned') return 'payment_confirmed';
   return value;
 }, z.enum(syncStatusValues));
+
+function inferDateSource(entry: Record<string, unknown>): PaymentDateSource {
+  if (typeof entry.dateSource === 'string') {
+    return entry.dateSource as PaymentDateSource;
+  }
+  const key = String(entry.notificationKey ?? '');
+  if (key.startsWith('remote-')) return 'remote_api';
+  if (key.startsWith('manual-')) return 'manual';
+  return 'unknown';
+}
 
 function normalizeLegacyPaymentEntry(raw: unknown): unknown {
   if (typeof raw !== 'object' || raw === null) return raw;
@@ -35,6 +56,15 @@ function normalizeLegacyPaymentEntry(raw: unknown): unknown {
   }
   delete entry.assignedClientId;
   delete entry.assignedClientName;
+
+  const repaired = repairPaymentDateTimeFields({
+    paymentDate: String(entry.paymentDate ?? ''),
+    paymentTime: String(entry.paymentTime ?? ''),
+  });
+  entry.paymentDate = repaired.paymentDate;
+  entry.paymentTime = repaired.paymentTime;
+  entry.dateSource = inferDateSource(entry);
+
   return entry;
 }
 
@@ -50,6 +80,7 @@ export const paymentRegisterCacheEntrySchema = z.preprocess(
     ref: z.string(),
     paymentDate: z.string(),
     paymentTime: z.string(),
+    dateSource: paymentDateSourceSchema,
     notificationKey: z.string().min(1),
     notificationId: z.string().min(1),
     invoiceStatus: z.enum(['pending', 'paid']).nullable(),
@@ -62,10 +93,32 @@ export const paymentRegisterCacheEntrySchema = z.preprocess(
   })
 );
 
-export const paymentRegisterStoreEnvelopeSchema = z.object({
+const paymentRegisterStoreEnvelopeV1Schema = z.object({
   version: z.literal(1),
   entries: z.array(paymentRegisterCacheEntrySchema),
 });
+
+const paymentRegisterStoreEnvelopeV2Schema = z.object({
+  version: z.literal(2),
+  entries: z.array(paymentRegisterCacheEntrySchema),
+});
+
+export const paymentRegisterStoreEnvelopeSchema = z.union([
+  paymentRegisterStoreEnvelopeV1Schema,
+  paymentRegisterStoreEnvelopeV2Schema,
+]);
+
+export function repairPaymentRegisterEntry(
+  entry: PaymentRegisterCacheEntry
+): PaymentRegisterCacheEntry {
+  const repaired = repairPaymentDateTimeFields(entry);
+  return {
+    ...entry,
+    paymentDate: repaired.paymentDate,
+    paymentTime: repaired.paymentTime,
+    dateSource: entry.dateSource ?? inferDateSource(entry),
+  };
+}
 
 const paymentSyncJobTypeSchema = z.enum(['create_register', 'confirm_payment', 'pull_registers']);
 

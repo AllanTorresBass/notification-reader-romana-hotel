@@ -1,5 +1,12 @@
 export type ParseConfidence = 'high' | 'partial' | 'failed';
 
+export type PaymentDateSource =
+  | 'notification_text'
+  | 'post_time'
+  | 'manual'
+  | 'remote_api'
+  | 'unknown';
+
 export interface ParsedPagomovil {
   name: string | null;
   pago: string;
@@ -7,6 +14,7 @@ export interface ParsedPagomovil {
   ref: string;
   paymentDate: string;
   paymentTime: string;
+  dateSource: PaymentDateSource;
   confidence: ParseConfidence;
 }
 

@@ -22,6 +22,7 @@ import 'react-native-reanimated';
 
 import { LaRomanaLogo } from '@/components/brand/LaRomanaLogo';
 import { AppProviders } from '@/providers/AppProviders';
+import { initPaymentDateTracing } from '@/lib/diagnostics/payment-date-trace';
 import { spacing } from '@/constants/theme';
 import { palette, resolveThemeMode } from '@/constants/theme';
 import { usePreferencesStore } from '@/stores/preferences-store';
@@ -29,6 +30,7 @@ import { usePreferencesStore } from '@/stores/preferences-store';
 export { AppErrorBoundary as ErrorBoundary } from '@/components/feedback/AppErrorBoundary';
 
 SplashScreen.preventAutoHideAsync();
+initPaymentDateTracing();
 
 export default function RootLayout() {
   const themePreference = usePreferencesStore((s) => s.theme);

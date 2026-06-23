@@ -26,6 +26,7 @@ const baseEntry: PaymentRegisterCacheEntry = {
   ref: '222917745208',
   paymentDate: '2026-06-02',
   paymentTime: '22:29',
+  dateSource: 'notification_text',
   notificationKey: 'key-1',
   notificationId: 'notif-1',
   createdAt: Date.now(),

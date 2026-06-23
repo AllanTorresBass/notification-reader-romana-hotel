@@ -24,6 +24,7 @@ import { formatPaymentDate, formatPaymentTime } from '@/lib/utils/format-payment
 import { isPaymentWorkflowComplete } from '@/lib/utils/merge-payment-register-state';
 import type { OperationOutcome } from '@/types/feedback/operation-outcome.types';
 import type { PaymentRegisterCacheEntry } from '@/types/payment/payment-register-cache.types';
+import Constants from 'expo-constants';
 
 export interface PaymentDetailSheetProps {
   entry: PaymentRegisterCacheEntry | null;
@@ -120,6 +121,29 @@ export const PaymentDetailSheet = forwardRef<BottomSheet, PaymentDetailSheetProp
                   missing={!entry.paymentDate && !isConfirmed}
                 />
                 <DetailRow label={copy.pagos.detail.time} value={formatPaymentTime(entry.paymentTime)} />
+                {entry.dateSource === 'post_time' ? (
+                  <Banner
+                    variant="warning"
+                    title="Fecha estimada"
+                    message="La fecha y hora provienen de la llegada de la notificación, no del texto del banco. Verifique antes de confirmar."
+                  />
+                ) : null}
+                {__DEV__ ? (
+                  <View style={styles.diagnostics}>
+                    <ThemedText variant="caption" muted>
+                      Diagnóstico (dev)
+                    </ThemedText>
+                    <ThemedText variant="caption" muted>
+                      raw: {entry.paymentDate || '—'} {entry.paymentTime || '—'}
+                    </ThemedText>
+                    <ThemedText variant="caption" muted>
+                      source: {entry.dateSource} · remote: {entry.remoteRegisterId ?? '—'}
+                    </ThemedText>
+                    <ThemedText variant="caption" muted>
+                      build: {Constants.expoConfig?.version ?? 'dev'}
+                    </ThemedText>
+                  </View>
+                ) : null}
                 <DetailRow
                   label={copy.pagos.detail.name}
                   value={entry.name ?? copy.pagos.detail.noName}
@@ -212,6 +236,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   grid: { gap: spacing.sm },
+  diagnostics: { gap: 2, paddingVertical: spacing.xs },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
   rowValue: { fontWeight: '600', flex: 1, textAlign: 'right' },
   actions: { gap: spacing.sm, marginTop: spacing.sm },

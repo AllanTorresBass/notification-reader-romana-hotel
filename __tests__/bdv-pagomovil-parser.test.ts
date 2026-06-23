@@ -37,6 +37,7 @@ describe('bdv-pagomovil-parser', () => {
     expect(result.ref).toBe('122506909857');
     expect(result.paymentDate).toBe('2026-06-06');
     expect(result.paymentTime).toBe('12:24');
+    expect(result.dateSource).toBe('notification_text');
     expect(result.name).toBeNull();
   });
 
@@ -52,6 +53,7 @@ describe('bdv-pagomovil-parser', () => {
     expect(result.mobile).toBe('sin-telefono');
     expect(result.ref).toBe('006280856778');
     expect(result.paymentDate).toBe('2026-06-06');
+    expect(result.dateSource).toBe('post_time');
   });
 
   it('parses Type A for BENHURT notification', () => {

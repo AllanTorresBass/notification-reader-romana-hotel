@@ -93,6 +93,7 @@ describe('PaymentRegisterService', () => {
         ref: '222917745208',
         paymentDate: '2026-06-02',
         paymentTime: '22:29',
+        dateSource: 'notification_text',
         syncStatus: 'pending_sync',
       })
     );

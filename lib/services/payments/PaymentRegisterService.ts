@@ -30,6 +30,7 @@ import {
   syncFailurePatch,
   syncSuccessFields,
 } from '@/lib/utils/payment-sync-failure';
+import { tracePaymentDatePipeline } from '@/lib/diagnostics/payment-date-trace';
 import {
   normalizePaymentDate,
   normalizePaymentTime,
@@ -109,6 +110,7 @@ export class PaymentRegisterService {
         ref: '',
         paymentDate: '',
         paymentTime: '',
+        dateSource: 'unknown',
         notificationKey,
         notificationId: record.id,
         ...syncFailurePatch('parse_failed', 'parse', 'No se pudo leer el texto. Complete manualmente.'),
@@ -133,6 +135,16 @@ export class PaymentRegisterService {
         : null;
     const ingestFailure = partialFailure ?? mobileFailure;
 
+    tracePaymentDatePipeline({
+      stage: 'parse',
+      notificationKey,
+      rawDate: parsed.paymentDate,
+      rawTime: parsed.paymentTime,
+      normalizedDate: normalizePaymentDate(parsed.paymentDate),
+      normalizedTime: normalizePaymentTime(parsed.paymentTime),
+      policy: parsed.dateSource,
+    });
+
     const entry = await paymentRegisterCacheRepository.upsert({
       name: parsed.name,
       pago,
@@ -140,6 +152,7 @@ export class PaymentRegisterService {
       ref: parsed.ref,
       paymentDate: parsed.paymentDate,
       paymentTime: parsed.paymentTime,
+      dateSource: parsed.dateSource,
       notificationKey,
       notificationId: record.id,
       syncStatus: ingestFailure ? 'sync_failed' : 'pending_sync',
@@ -228,6 +241,7 @@ export class PaymentRegisterService {
       ref: input.ref,
       paymentDate: input.paymentDate,
       paymentTime: input.paymentTime,
+      dateSource: 'manual',
       notificationKey,
       notificationId: notificationKey,
       syncStatus: 'pending_sync',
@@ -297,6 +311,11 @@ export class PaymentRegisterService {
         updated,
         total: payments.length,
       });
+    }
+
+    const repaired = await paymentRegisterCacheRepository.repairAllEntries();
+    if (repaired > 0) {
+      logger.info('Post-pull payment date repair completed', { repaired });
     }
 
     return { imported, updated, total: payments.length };

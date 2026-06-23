@@ -11,7 +11,7 @@ export const STORAGE_KEYS = {
   activityLogSyncQueue: 'nr.activity-log-sync-queue.v1',
 } as const;
 
-export const STORAGE_VERSION = 1;
+export const STORAGE_VERSION = 2;
 
 export const MAX_NOTIFICATION_RECORDS = 500;
 export const MAX_PAYMENT_REGISTER_ENTRIES = 500;
