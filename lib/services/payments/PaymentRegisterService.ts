@@ -30,6 +30,10 @@ import {
   syncFailurePatch,
   syncSuccessFields,
 } from '@/lib/utils/payment-sync-failure';
+import {
+  normalizePaymentDate,
+  normalizePaymentTime,
+} from '@/lib/utils/format-payment-datetime';
 import { BACKEND_NAME } from '@/constants/backend';
 import { getUserErrorMessage } from '@/lib/utils/user-error-message';
 import { useApiConfigStore } from '@/stores/api-config-store';
@@ -265,22 +269,37 @@ export class PaymentRegisterService {
     return { entry, status: 'queued' };
   }
 
-  async pullRemote(): Promise<void> {
-    if (!useApiAuthStore.getState().isAuthenticated()) return;
+  async pullRemote(): Promise<{ imported: number; updated: number; total: number }> {
+    if (!useApiAuthStore.getState().isAuthenticated()) {
+      return { imported: 0, updated: 0, total: 0 };
+    }
 
-    const payments = await paymentApiService.list();
-    await paymentRegisterCacheRepository.mergeRemoteEntries(
+    const payments = (await paymentApiService.list()).filter((payment) => !payment.deletedAt);
+    const { imported, updated } = await paymentRegisterCacheRepository.mergeRemoteEntries(
       payments.map((payment) => ({
         id: String(payment.id),
         name: payment.payerName,
         pago: payment.amount,
         mobile: payment.payerPhone ?? '',
+        ref: payment.reference,
+        paymentDate: normalizePaymentDate(payment.paymentDate),
+        paymentTime: normalizePaymentTime(payment.paymentTime),
         invoiceId: null,
         invoiceStatus: payment.status === 'confirmado' ? 'paid' : 'pending',
         notificationKey: payment.notificationKey,
       }))
     );
     useApiConfigStore.getState().setLastSyncAt(Date.now());
+
+    if (imported > 0 || updated > 0) {
+      logger.info('Merged remote payments into local cache', {
+        imported,
+        updated,
+        total: payments.length,
+      });
+    }
+
+    return { imported, updated, total: payments.length };
   }
 
   async processQueue(): Promise<QueueProcessResult> {

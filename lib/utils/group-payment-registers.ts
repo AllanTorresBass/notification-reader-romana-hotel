@@ -1,43 +1,63 @@
 import type { PaymentRegisterCacheEntry } from '@/types/payment/payment-register-cache.types';
+import {
+  formatPaymentDate,
+  getCaracasTodayKey,
+  getCaracasYesterdayKey,
+  getEntrySortTimestamp,
+  parsePaymentCalendarDate,
+  toCalendarDateKey,
+} from '@/lib/utils/format-payment-datetime';
 
 export interface PaymentTimelineSection {
   title: string;
   data: PaymentRegisterCacheEntry[];
 }
 
-function startOfDay(timestamp: number): number {
-  const date = new Date(timestamp);
-  date.setHours(0, 0, 0, 0);
-  return date.getTime();
-}
+function getSectionLabel(timestamp: number, now: number): string {
+  const dateKey = toCalendarDateKey(new Date(timestamp));
+  if (!dateKey) {
+    return new Date(timestamp).toLocaleDateString('es-VE', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  }
 
-function getSectionLabel(postTime: number, now: number): string {
-  const todayStart = startOfDay(now);
-  const yesterdayStart = todayStart - 86_400_000;
-  const dayStart = startOfDay(postTime);
-
-  if (dayStart === todayStart) {
+  if (dateKey === getCaracasTodayKey(now)) {
     return 'Hoy';
   }
-  if (dayStart === yesterdayStart) {
+  if (dateKey === getCaracasYesterdayKey(now)) {
     return 'Ayer';
   }
-  return new Date(postTime).toLocaleDateString('es-VE', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
+  return formatPaymentDate(dateKey);
+}
+
+function getSectionTitle(entry: PaymentRegisterCacheEntry, now: number): string {
+  const paymentKey = parsePaymentCalendarDate(entry.paymentDate);
+  if (paymentKey && entry.paymentDate.trim()) {
+    if (paymentKey === getCaracasTodayKey(now)) {
+      return 'Hoy';
+    }
+    if (paymentKey === getCaracasYesterdayKey(now)) {
+      return 'Ayer';
+    }
+    return formatPaymentDate(entry.paymentDate);
+  }
+
+  return getSectionLabel(entry.createdAt, now);
 }
 
 export function groupPaymentRegistersByDate(
   entries: PaymentRegisterCacheEntry[]
 ): PaymentTimelineSection[] {
   const now = Date.now();
-  const sorted = [...entries].sort((a, b) => b.createdAt - a.createdAt);
+  const sorted = [...entries].sort(
+    (a, b) => getEntrySortTimestamp(b) - getEntrySortTimestamp(a)
+  );
   const sections: PaymentTimelineSection[] = [];
 
   for (const entry of sorted) {
-    const label = getSectionLabel(entry.createdAt, now);
+    const label = getSectionTitle(entry, now);
     const last = sections[sections.length - 1];
     if (last?.title === label) {
       last.data.push(entry);

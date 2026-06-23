@@ -11,6 +11,11 @@ import { logger } from '@/lib/logger';
 import { paymentRegisterStoreEnvelopeSchema } from '@/types/payment/payment-register-cache.schemas';
 import { mergeInvoiceStatus, mergeSyncStatus } from '@/lib/utils/merge-payment-register-state';
 import { filterPaymentRegisters, getPaymentFilterCounts } from '@/lib/utils/filter-payment-registers';
+import {
+  normalizePaymentDate,
+  normalizePaymentTime,
+  parsePaymentCalendarDate,
+} from '@/lib/utils/format-payment-datetime';
 import type {
   PaymentRegisterCacheEntry,
   PaymentRegisterFilterCounts,
@@ -21,6 +26,38 @@ import type {
 
 function generateLocalId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+function isRemoteOnlyEntry(entry: Pick<PaymentRegisterCacheEntry, 'notificationKey'>): boolean {
+  return entry.notificationKey.startsWith('remote-');
+}
+
+function resolveMergedPaymentDate(
+  existing: PaymentRegisterCacheEntry,
+  remoteDate: string
+): string {
+  const localKey = parsePaymentCalendarDate(existing.paymentDate);
+  const remoteKey = normalizePaymentDate(remoteDate);
+
+  if (localKey && existing.paymentDate.trim() && !isRemoteOnlyEntry(existing)) {
+    return localKey;
+  }
+
+  return remoteKey || localKey || existing.paymentDate || '';
+}
+
+function resolveMergedPaymentTime(
+  existing: PaymentRegisterCacheEntry,
+  remoteTime: string
+): string {
+  const localTime = normalizePaymentTime(existing.paymentTime);
+  const remoteTimeKey = normalizePaymentTime(remoteTime);
+
+  if (localTime && existing.paymentTime.trim() && !isRemoteOnlyEntry(existing)) {
+    return localTime;
+  }
+
+  return remoteTimeKey || localTime || existing.paymentTime || '';
 }
 
 export class PaymentRegisterCacheRepository extends BaseStorageRepository {
@@ -118,8 +155,8 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
       pago: input.pago,
       mobile: input.mobile,
       ref: input.ref,
-      paymentDate: input.paymentDate,
-      paymentTime: input.paymentTime,
+      paymentDate: normalizePaymentDate(input.paymentDate),
+      paymentTime: normalizePaymentTime(input.paymentTime),
       notificationKey: input.notificationKey,
       notificationId: input.notificationId,
       invoiceStatus: input.invoiceStatus ?? existing?.invoiceStatus ?? null,
@@ -213,13 +250,20 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
       name: string | null;
       pago: string;
       mobile: string;
+      ref: string;
+      paymentDate: string;
+      paymentTime: string;
       invoiceId: string | null;
       invoiceStatus: 'pending' | 'paid' | null;
       notificationKey: string | null;
     }>
-  ): Promise<void> {
+  ): Promise<{ updated: number; imported: number }> {
     const entries = await this.hydrate();
-    const byRemoteId = new Map(entries.filter((e) => e.remoteRegisterId).map((e) => [e.remoteRegisterId!, e]));
+    const byRemoteId = new Map(
+      entries.filter((e) => e.remoteRegisterId).map((e) => [e.remoteRegisterId!, e])
+    );
+    let updated = 0;
+    let imported = 0;
 
     for (const remote of remoteEntries) {
       const existing =
@@ -235,10 +279,44 @@ export class PaymentRegisterCacheRepository extends BaseStorageRepository {
           name: remote.name ?? existing.name,
           pago: remote.pago,
           mobile: remote.mobile,
-          syncStatus: mergeSyncStatus(existing.syncStatus, invoiceStatus),
+          ref: remote.ref || existing.ref,
+          paymentDate: resolveMergedPaymentDate(existing, remote.paymentDate),
+          paymentTime: resolveMergedPaymentTime(existing, remote.paymentTime),
+          syncStatus: mergeSyncStatus(existing.syncStatus, remote.invoiceStatus),
         });
+        updated += 1;
+        continue;
       }
+
+      const notificationKey = remote.notificationKey ?? `remote-${remote.id}`;
+      const syncStatus: SyncStatus =
+        remote.invoiceStatus === 'paid' ? 'payment_confirmed' : 'synced';
+
+      await this.upsert({
+        remoteRegisterId: remote.id,
+        remoteInvoiceId: remote.invoiceId,
+        name: remote.name,
+        pago: remote.pago,
+        mobile: remote.mobile,
+        ref: remote.ref,
+        paymentDate: normalizePaymentDate(remote.paymentDate),
+        paymentTime: normalizePaymentTime(remote.paymentTime),
+        notificationKey,
+        notificationId: notificationKey,
+        invoiceStatus: remote.invoiceStatus,
+        syncStatus,
+        lastSyncError: null,
+        failureClass: null,
+        failureStage: null,
+      });
+      imported += 1;
     }
+
+    if (imported > 0) {
+      await this.flush();
+    }
+
+    return { updated, imported };
   }
 
   async clearAll(): Promise<void> {

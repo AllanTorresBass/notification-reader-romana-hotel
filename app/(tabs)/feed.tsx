@@ -35,11 +35,20 @@ export default function PagosScreen() {
   const filterBar = !feed.cacheEmpty && !feed.showManual ? (
     <PaymentFilterBar
       status={feed.statusFilter}
-      search={feed.searchInput}
+      search={feed.searchInput ?? ''}
+      dateFrom={feed.dateFrom ?? ''}
+      dateTo={feed.dateTo ?? ''}
+      timeFrom={feed.timeFrom ?? ''}
+      timeTo={feed.timeTo ?? ''}
       counts={feed.filterCounts}
       filteredTotal={feed.filteredTotal}
       onStatusChange={feed.setStatusFilter}
       onSearchChange={feed.setSearchInput}
+      onDateFromChange={feed.setDateFrom}
+      onDateToChange={feed.setDateTo}
+      onTimeFromChange={feed.setTimeFrom}
+      onTimeToChange={feed.setTimeTo}
+      onClearFilters={feed.clearFilters}
     />
   ) : null;
 

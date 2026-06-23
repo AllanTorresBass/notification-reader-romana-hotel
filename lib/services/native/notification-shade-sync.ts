@@ -12,6 +12,7 @@ export type NotificationShadeSyncResult = {
   /** Payment register entries created (Pagomóvil) */
   ingested: number;
   listenerConnected: boolean;
+  accessGranted: boolean;
 };
 
 async function ingestEvents(
@@ -54,14 +55,27 @@ export async function syncNotificationsFromShade(options: {
   allowedPackages: string[];
   retentionDays: number;
   captureRawPayload: boolean;
+  waitForListener?: boolean;
 }): Promise<NotificationShadeSyncResult> {
   if (Platform.OS !== 'android' || options.allowedPackages.length === 0) {
-    return { scanned: 0, stored: 0, ingested: 0, listenerConnected: false };
+    return {
+      scanned: 0,
+      stored: 0,
+      ingested: 0,
+      listenerConnected: false,
+      accessGranted: false,
+    };
   }
 
   notificationListenerBridge.setAllowedPackages(options.allowedPackages);
 
-  const listenerConnected = notificationListenerBridge.isListenerConnected();
+  const accessGranted = await notificationListenerBridge.isAccessGranted();
+  let listenerConnected = notificationListenerBridge.isListenerConnected();
+
+  if (accessGranted && !listenerConnected && options.waitForListener !== false) {
+    listenerConnected = await notificationListenerBridge.ensureListenerConnection();
+  }
+
   const active = notificationListenerBridge.getActiveNotifications();
   const seenKeys = new Set<string>();
   const activeCounts = await ingestEvents(active, seenKeys, options);
@@ -72,17 +86,18 @@ export async function syncNotificationsFromShade(options: {
 
   const stored = activeCounts.stored + queuedCounts.stored;
   const ingested = activeCounts.ingested + queuedCounts.ingested;
-  const scanned = active.length;
+  const scanned = active.length + queued.length;
 
-  if (scanned > 0 || stored > 0 || ingested > 0 || queued.length > 0) {
+  if (scanned > 0 || stored > 0 || ingested > 0 || !listenerConnected) {
     logger.info('Synced notifications from shade', {
       scanned,
       stored,
       ingested,
       queued: queued.length,
       listenerConnected,
+      accessGranted,
     });
   }
 
-  return { scanned, stored, ingested, listenerConnected };
+  return { scanned, stored, ingested, listenerConnected, accessGranted };
 }

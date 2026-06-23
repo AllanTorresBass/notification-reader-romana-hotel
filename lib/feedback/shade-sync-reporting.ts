@@ -4,8 +4,10 @@ import { reportOutcome } from '@/lib/feedback/report-feedback';
 import type { ReportOutcomeOptions } from '@/types/feedback/report-outcome.types';
 
 export function shouldReportShadeSyncOutcome(result: NotificationShadeSyncResult): boolean {
-  if (!result.listenerConnected) return true;
-  if (result.scanned > 0 || result.ingested > 0) return true;
+  if (result.stored > 0 || result.ingested > 0) return true;
+  if (!result.accessGranted) return true;
+  if (!result.listenerConnected && result.scanned === 0) return false;
+  if (result.scanned > 0) return true;
   return false;
 }
 

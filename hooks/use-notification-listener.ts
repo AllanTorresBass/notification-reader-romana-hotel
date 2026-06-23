@@ -68,6 +68,7 @@ export function useNotificationListener() {
       return;
     }
     notificationListenerBridge.setAllowedPackages([...ALLOWED_PACKAGES]);
+    void notificationListenerBridge.ensureListenerConnection();
   }, []);
 
   useEffect(() => {
@@ -101,9 +102,32 @@ export function useNotificationListener() {
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
-        void flushQueuedNotifications();
+        void notificationListenerBridge.ensureListenerConnection().then((connected) => {
+          if (connected) {
+            void flushQueuedNotifications();
+          }
+        });
       }
     });
     return () => sub.remove();
-  }, [flushQueuedNotifications, queryClient]);
+  }, [flushQueuedNotifications]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
+    const reconnect = () => {
+      void notificationListenerBridge.ensureListenerConnection({ timeoutMs: 3000 }).then(
+        (connected) => {
+          if (connected) {
+            void flushQueuedNotifications();
+          }
+        }
+      );
+    };
+
+    const interval = setInterval(reconnect, 5000);
+    return () => clearInterval(interval);
+  }, [flushQueuedNotifications]);
 }

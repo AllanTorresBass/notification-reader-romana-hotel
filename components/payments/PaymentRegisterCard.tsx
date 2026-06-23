@@ -48,8 +48,12 @@ function getSecondaryLine(entry: PaymentRegisterCacheEntry): string {
   const when = formatPaymentDateTime(entry.paymentDate, entry.paymentTime);
   if (when) parts.push(when);
 
+  if (entry.mobile && entry.mobile !== 'sin-leer') {
+    parts.push(entry.mobile);
+  }
+
   if (parts.length > 0) return parts.join(' · ');
-  return `${copy.pagos.detail.emitterPhone}: ${entry.mobile}`;
+  return copy.pagos.detail.emitterPhone;
 }
 
 export function PaymentRegisterCard({ entry, onPress }: PaymentRegisterCardProps) {
@@ -70,22 +74,25 @@ export function PaymentRegisterCard({ entry, onPress }: PaymentRegisterCardProps
     >
       <Card style={StyleSheet.flatten([styles.card, { borderLeftWidth: 3, borderLeftColor: accentColor, borderTopLeftRadius: radius.lg, borderBottomLeftRadius: radius.lg }])}>
         <View style={styles.topRow}>
-          <ThemedText variant="heading" style={[styles.amount, { fontFamily: fonts.monoMedium }]}>
-            Bs. {formatPagoDisplay(entry.pago)}
-          </ThemedText>
+          <View style={styles.amountBlock}>
+            <ThemedText variant="heading" style={[styles.amount, { fontFamily: fonts.monoMedium }]}>
+              Bs. {formatPagoDisplay(entry.pago)}
+            </ThemedText>
+            {entry.name ? (
+              <ThemedText variant="caption" muted numberOfLines={1}>
+                {entry.name}
+              </ThemedText>
+            ) : null}
+          </View>
           <View style={styles.topRight}>
             <Badge label={statusLabel} variant={getBadgeVariant(entry.syncStatus)} />
             {showOffline ? <CloudOff color={colors.textMuted} size={16} /> : null}
           </View>
         </View>
 
-        <ThemedText variant="caption" muted numberOfLines={1}>
+        <ThemedText variant="caption" muted numberOfLines={2}>
           {getSecondaryLine(entry)}
         </ThemedText>
-
-        {entry.name ? (
-          <Badge label={entry.name} variant="secondary" />
-        ) : null}
 
         {actionHint ? (
           <ThemedText
@@ -111,10 +118,11 @@ const styles = StyleSheet.create({
   card: { padding: spacing.md, gap: spacing.xs, minHeight: MIN_TOUCH_TARGET * 2 },
   topRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
+  amountBlock: { flex: 1, gap: 2 },
   topRight: {
     flexDirection: 'row',
     alignItems: 'center',

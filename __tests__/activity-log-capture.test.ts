@@ -14,10 +14,14 @@ import type { OperationOutcome } from '@/types/feedback/operation-outcome.types'
 function shouldReportShadeSyncOutcome(result: {
   scanned: number;
   ingested: number;
+  stored?: number;
   listenerConnected: boolean;
+  accessGranted: boolean;
 }): boolean {
-  if (!result.listenerConnected) return true;
-  if (result.scanned > 0 || result.ingested > 0) return true;
+  if ((result.stored ?? 0) > 0 || result.ingested > 0) return true;
+  if (!result.accessGranted) return true;
+  if (!result.listenerConnected && result.scanned === 0) return false;
+  if (result.scanned > 0) return true;
   return false;
 }
 
@@ -53,15 +57,36 @@ describe('shouldSkipDuplicateReport', () => {
 });
 
 describe('shouldReportShadeSyncOutcome', () => {
-  it('reports when listener is disconnected', () => {
+  it('reports when notification access is not granted', () => {
     expect(
-      shouldReportShadeSyncOutcome({ scanned: 0, ingested: 0, listenerConnected: false })
+      shouldReportShadeSyncOutcome({
+        scanned: 0,
+        ingested: 0,
+        listenerConnected: false,
+        accessGranted: false,
+      })
     ).toBe(true);
+  });
+
+  it('skips transient listener warmup when access is granted', () => {
+    expect(
+      shouldReportShadeSyncOutcome({
+        scanned: 0,
+        ingested: 0,
+        listenerConnected: false,
+        accessGranted: true,
+      })
+    ).toBe(false);
   });
 
   it('skips when listener is connected and nothing scanned', () => {
     expect(
-      shouldReportShadeSyncOutcome({ scanned: 0, ingested: 0, listenerConnected: true })
+      shouldReportShadeSyncOutcome({
+        scanned: 0,
+        ingested: 0,
+        listenerConnected: true,
+        accessGranted: true,
+      })
     ).toBe(false);
   });
 });

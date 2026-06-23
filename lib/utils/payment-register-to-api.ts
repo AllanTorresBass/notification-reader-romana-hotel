@@ -1,6 +1,12 @@
 import { BANCO_DE_VENEZUELA_LABEL } from '@/constants/whitelist-defaults';
 import type { CreatePaymentInput, UpdatePaymentInput } from '@/lib/api-client/payments/PaymentApiService';
 import { normalizePagoAmount } from '@/lib/utils/bdv-pagomovil-parser';
+import {
+  instantToCaracasDateKey,
+  instantToCaracasWallTime,
+  normalizePaymentDate,
+  normalizePaymentTime,
+} from '@/lib/utils/format-payment-datetime';
 import type { PaymentRegisterCacheEntry } from '@/types/payment/payment-register-cache.types';
 
 function resolveReference(entry: PaymentRegisterCacheEntry): string {
@@ -10,13 +16,12 @@ function resolveReference(entry: PaymentRegisterCacheEntry): string {
 }
 
 function resolvePaymentDate(entry: PaymentRegisterCacheEntry): string {
-  if (entry.paymentDate.trim()) return entry.paymentDate;
-  return new Date(entry.createdAt).toISOString().split('T')[0];
+  return normalizePaymentDate(entry.paymentDate) || instantToCaracasDateKey(entry.createdAt);
 }
 
 function resolvePaymentTime(entry: PaymentRegisterCacheEntry): string {
-  if (entry.paymentTime.trim()) return entry.paymentTime;
-  return new Date(entry.createdAt).toTimeString().slice(0, 5);
+  if (entry.paymentTime.trim()) return normalizePaymentTime(entry.paymentTime);
+  return instantToCaracasWallTime(entry.createdAt);
 }
 
 function resolveStatus(entry: PaymentRegisterCacheEntry): 'confirmado' | 'pendiente' {

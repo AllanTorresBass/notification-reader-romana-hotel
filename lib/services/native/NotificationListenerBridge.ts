@@ -135,6 +135,81 @@ export class NotificationListenerBridge {
     }
   }
 
+  requestListenerRebind(): boolean {
+    if (!this.isSupported()) {
+      return false;
+    }
+    try {
+      const mod = ExpoAndroidNotificationListenerService as typeof ExpoAndroidNotificationListenerService & {
+        requestListenerRebind?: () => boolean;
+      };
+      if (typeof mod.requestListenerRebind !== 'function') {
+        return false;
+      }
+      return mod.requestListenerRebind();
+    } catch (error) {
+      reportServiceError(
+        'listener_bridge_failure',
+        error,
+        copy.feedback.infra.listenerBridgeMessage,
+        { source: 'NotificationListenerBridge.requestListenerRebind' }
+      );
+      return false;
+    }
+  }
+
+  async ensureListenerConnection(options?: {
+    timeoutMs?: number;
+    intervalMs?: number;
+    rebindIntervalMs?: number;
+  }): Promise<boolean> {
+    if (!this.isSupported()) {
+      return false;
+    }
+
+    if (!(await this.isAccessGranted())) {
+      return false;
+    }
+
+    if (this.isListenerConnected()) {
+      return true;
+    }
+
+    return this.waitForListenerConnection(options);
+  }
+
+  async waitForListenerConnection(options?: {
+    timeoutMs?: number;
+    intervalMs?: number;
+    rebindIntervalMs?: number;
+  }): Promise<boolean> {
+    if (!this.isSupported()) {
+      return false;
+    }
+
+    const timeoutMs = options?.timeoutMs ?? 8000;
+    const intervalMs = options?.intervalMs ?? 200;
+    const rebindIntervalMs = options?.rebindIntervalMs ?? 1000;
+    const deadline = Date.now() + timeoutMs;
+    let lastRebind = 0;
+
+    while (Date.now() < deadline) {
+      if (this.isListenerConnected()) {
+        return true;
+      }
+
+      const now = Date.now();
+      if (now - lastRebind >= rebindIntervalMs) {
+        this.requestListenerRebind();
+        lastRebind = now;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+
+    return this.isListenerConnected();
+  }
+
   subscribe(
     handler: (notification: NotificationData) => void
   ): EventSubscription | null {

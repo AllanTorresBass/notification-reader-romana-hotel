@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# built APKs (use scripts/build-release-apk.sh locally)
+*.apk

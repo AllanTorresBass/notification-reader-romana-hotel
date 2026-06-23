@@ -179,20 +179,51 @@ describe('formatPullSyncOutcome', () => {
 });
 
 describe('formatShadeSyncOutcome', () => {
-  it('returns failed when listener disconnected', () => {
-    const outcome = formatShadeSyncOutcome({ scanned: 0, ingested: 0, listenerConnected: false });
+  it('returns failed when notification access is not granted', () => {
+    const outcome = formatShadeSyncOutcome({
+      scanned: 0,
+      ingested: 0,
+      stored: 0,
+      listenerConnected: false,
+      accessGranted: false,
+    });
+    expect(outcome.status).toBe('failed');
+    expect(outcome.title).toBe(copy.feedback.notifications.serviceDownTitle);
+    expect(outcome.message).toBe(copy.feedback.notifications.serviceDownShort);
+  });
+
+  it('returns failed when listener disconnected after wait', () => {
+    const outcome = formatShadeSyncOutcome({
+      scanned: 0,
+      ingested: 0,
+      stored: 0,
+      listenerConnected: false,
+      accessGranted: true,
+    });
     expect(outcome.status).toBe('failed');
     expect(outcome.title).toBe(copy.feedback.notifications.serviceDownTitle);
   });
 
   it('returns skipped when no notifications', () => {
-    const outcome = formatShadeSyncOutcome({ scanned: 0, ingested: 0, listenerConnected: true });
+    const outcome = formatShadeSyncOutcome({
+      scanned: 0,
+      ingested: 0,
+      stored: 0,
+      listenerConnected: true,
+      accessGranted: true,
+    });
     expect(outcome.status).toBe('skipped');
     expect(outcome.title).toBe(copy.feedback.notifications.emptyTitle);
   });
 
   it('returns completed when ingested', () => {
-    const outcome = formatShadeSyncOutcome({ scanned: 3, ingested: 2, listenerConnected: true });
+    const outcome = formatShadeSyncOutcome({
+      scanned: 3,
+      ingested: 2,
+      stored: 2,
+      listenerConnected: true,
+      accessGranted: true,
+    });
     expect(outcome.status).toBe('completed');
     expect(outcome.title).toBe(copy.feedback.notifications.importedTitle);
     expect(outcome.message).toContain('3 alertas BDV');
